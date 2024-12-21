@@ -10,7 +10,7 @@ const ExamPortal = () => {
   const userEmail = "sriram.lnrs@gmail.com";
 
   useEffect(() => {
-    let timer;
+    let timer: NodeJS.Timeout | undefined;  // or: let timer: ReturnType<typeof setInterval> | undefined;
     if (examStarted && timeLeft > 0) {
       timer = setInterval(() => {
         setTimeLeft((prev) => {
@@ -26,7 +26,7 @@ const ExamPortal = () => {
     return () => clearInterval(timer);
   }, [examStarted, timeLeft]);
 
-  const formatTime = (seconds) => {
+  const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
@@ -41,7 +41,7 @@ const ExamPortal = () => {
     setCurrentSection("mcqs"); // Automatically move to first section
   };
 
-  const handleSectionChange = (section) => {
+  const handleSectionChange = (section: string) => {
     if (!examStarted && section !== "home") {
       return; // Prevent accessing other sections before exam starts
     }
