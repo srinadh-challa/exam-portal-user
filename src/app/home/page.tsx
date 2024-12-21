@@ -40,7 +40,7 @@ const ExamPortal = () => {
     setExamStarted(true);
   };
 
-  const handleSectionChange = (section) => {
+  const handleSectionChange = (section: string) => {
     setCurrentSection(section);
   };
 
