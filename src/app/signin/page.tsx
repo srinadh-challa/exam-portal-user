@@ -27,7 +27,7 @@ const SignInPage = () => {
     setError(''); // Clear error when user types
   };
   
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
     // Check against static credentials
