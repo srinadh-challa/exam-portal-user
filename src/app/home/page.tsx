@@ -10,7 +10,7 @@ const ExamPortal = () => {
   const userEmail = "user@example.com";
 
   useEffect(() => {
-    let timer;
+    let timer: NodeJS.Timeout | undefined;
     if (examStarted && timeLeft > 0) {
       timer = setInterval(() => {
         setTimeLeft((prev) => {
