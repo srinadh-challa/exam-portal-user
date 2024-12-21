@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Timer, Home, BookOpen, Brain, Code, Mail, RedoDot, LogOut } from "lucide-react";
+import { Timer, Home, BookOpen, Brain, Code, Mail, RedoDot} from "lucide-react";
 
 const ExamPortal = () => {
   const [timeLeft, setTimeLeft] = useState(60 * 60); // 60 minutes in seconds
@@ -10,7 +10,7 @@ const ExamPortal = () => {
   const userEmail = "user@example.com";
 
   useEffect(() => {
-    let timer: any;
+    let timer;
     if (examStarted && timeLeft > 0) {
       timer = setInterval(() => {
         setTimeLeft((prev) => {
@@ -40,7 +40,7 @@ const ExamPortal = () => {
     setExamStarted(true);
   };
 
-  const handleSectionChange = (section: any) => {
+  const handleSectionChange = (section) => {
     setCurrentSection(section);
   };
 

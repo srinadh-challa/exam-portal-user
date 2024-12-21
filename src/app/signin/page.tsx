@@ -19,7 +19,7 @@ const SignInPage = () => {
   });
   const [error, setError] = useState('');
   
-  const handleInputChange = (e: any) => {
+  const handleInputChange = (e) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value
@@ -27,7 +27,7 @@ const SignInPage = () => {
     setError(''); // Clear error when user types
   };
   
-  const handleSubmit = (e: any) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     
     // Check against static credentials
