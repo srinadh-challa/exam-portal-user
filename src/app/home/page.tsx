@@ -1,16 +1,159 @@
-"use client";
+"use client"
 
-import React, { useState, useEffect } from "react";
-import { Timer, Home, BookOpen, Brain, Code, Mail, RedoDot } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { Timer, Home, BookOpen, Brain, Code, Mail, RedoDot, ArrowLeft, ArrowRight, Camera, VideoOff, AlertCircle } from "lucide-react";
+
+type AnswersType = {
+  [key: string]: string;
+};
 
 const ExamPortal = () => {
-  const [timeLeft, setTimeLeft] = useState(60 * 60);
-  const [examStarted, setExamStarted] = useState(false);
-  const [currentSection, setCurrentSection] = useState("home");
+  const [timeLeft, setTimeLeft] = useState<number>(60 * 60);
+  const [examStarted, setExamStarted] = useState<boolean>(false);
+  const [currentSection, setCurrentSection] = useState<string>("home");
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0);
+  const [cameraEnabled, setCameraEnabled] = useState<boolean>(false);
+  const [isRecording, setIsRecording] = useState<boolean>(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [answers, setAnswers] = useState<AnswersType>({});
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  // const [isPreviewExpanded, setIsPreviewExpanded] = useState<boolean>(false);
+
   const userEmail = "sriram.lnrs@gmail.com";
 
+  // const togglePreviewSize = () => {
+  //   setIsPreviewExpanded(!isPreviewExpanded);
+  // };
+
+  // Initialize camera when exam starts
   useEffect(() => {
-    let timer: NodeJS.Timeout | undefined;  // or: let timer: ReturnType<typeof setInterval> | undefined;
+    if (examStarted && !cameraEnabled) {
+      initializeCamera();
+    }
+    return () => {
+      if (mediaRecorderRef.current) {
+        mediaRecorderRef.current.stop();
+      }
+      if (videoRef.current?.srcObject instanceof MediaStream) {
+        const tracks = videoRef.current.srcObject.getTracks();
+        tracks.forEach(track => track.stop());
+      }
+    };
+  }, [examStarted]);
+
+  const initializeCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true
+      });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+      setCameraEnabled(true);
+      startRecording(stream);
+    } catch (error) {
+      console.error("Error accessing camera:", error);
+      setCameraError("Unable to access camera. Please ensure camera permissions are granted.");
+    }
+  };
+
+  const startRecording = (stream: MediaStream) => {
+    try {
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          // Here you would typically send the recorded chunk to your server
+          console.log("Recording data available", event.data);
+        }
+      };
+
+      mediaRecorder.start(1000); // Capture in 1-second chunks
+      setIsRecording(true);
+    } catch (error) {
+      console.error("Error starting recording:", error);
+      setCameraError("Unable to start recording. Please refresh and try again.");
+    }
+  };
+
+  type ExamSection = {
+    title: string;
+    questions: {
+      id: number;
+      text: string;
+      options: string[];
+    }[];
+  };
+
+  // Sample questions data structure
+  const examSections: Record<string, ExamSection> = {
+    mcqs: {
+      title: "Multiple Choice Questions",
+      questions: [
+        { id: 1, text: "What is the capital of France?", options: ["London", "Berlin", "Paris", "Madrid"] },
+        { id: 2, text: "Which programming language is known as the 'mother of all programming languages'?", options: ["C", "Assembly", "FORTRAN", "ALGOL"] },
+        { id: 3, text: "Who is considered the father of computer science?", options: ["Alan Turing", "Charles Babbage", "John von Neumann", "Ada Lovelace"] },
+        { id: 4, text: "What does CPU stand for?", options: ["Central Processing Unit", "Computer Processing Unit", "Central Program Utility", "Computer Program Unit"] },
+        { id: 5, text: "Which company developed the Java programming language?", options: ["Microsoft", "Sun Microsystems", "IBM", "Oracle"] },
+        { id: 6, text: "What is the primary function of RAM?", options: ["Permanent Storage", "Temporary Storage", "Processing Data", "Data Transfer"] },
+        { id: 7, text: "What does HTML stand for?", options: ["Hyper Text Markup Language", "High Text Making Language", "Hyper Transfer Markup Language", "High Transfer Making Language"] },
+        { id: 8, text: "Which protocol is used for sending emails?", options: ["HTTP", "FTP", "SMTP", "TCP"] },
+        { id: 9, text: "What is the smallest unit of digital information?", options: ["Byte", "Bit", "Nibble", "Word"] },
+        { id: 10, text: "Which company created React.js?", options: ["Google", "Facebook", "Amazon", "Microsoft"] },
+      ]
+    },
+    aptitude: {
+      title: "Aptitude Test",
+      questions: [
+        { id: 1, text: "If a train travels 420 kilometers in 7 hours, what is its speed in kilometers per hour?", options: ["50 km/h", "60 km/h", "65 km/h", "70 km/h"] },
+        { id: 2, text: "A computer program runs in 0.08 seconds. How many times can it run in 2 minutes?", options: ["1200", "1500", "1800", "2000"] },
+        { id: 3, text: "If 3 developers can build an app in 12 days, how many days will it take 4 developers?", options: ["9 days", "8 days", "10 days", "11 days"] },
+        { id: 4, text: "What comes next in the sequence: 2, 6, 12, 20, ?", options: ["28", "30", "32", "34"] },
+        { id: 5, text: "A server processes 4000 requests per minute. How many requests can it process in 2.5 hours?", options: ["600,000", "480,000", "520,000", "550,000"] },
+        { id: 6, text: "Find the missing number: 8, 27, 64, ?, 216", options: ["125", "128", "132", "144"] },
+        { id: 7, text: "If a code review takes 45 minutes, how many can be completed in a 6-hour workday?", options: ["8", "7", "6", "9"] },
+        { id: 8, text: "What percentage of 250GB is 40GB?", options: ["16%", "20%", "15%", "18%"] },
+        { id: 9, text: "Solve: (2^6 × 2^4) ÷ 2^7", options: ["8", "16", "32", "64"] },
+        { id: 10, text: "If a function takes 100ms to execute, how many times can it run in 3 seconds?", options: ["30", "20", "25", "35"] }
+      ]
+    },
+    ai: {
+      title: "Artificial Intelligence",
+      questions: [
+        { id: 1, text: "Which of these is NOT a type of machine learning?", options: ["Supervised Learning", "Unsupervised Learning", "Peripheral Learning", "Reinforcement Learning"] },
+        { id: 2, text: "What is the purpose of the activation function in neural networks?", options: ["Data Storage", "Introduce Non-linearity", "Data Cleaning", "Memory Management"] },
+        { id: 3, text: "Which algorithm is commonly used for image classification?", options: ["Linear Regression", "CNN", "Decision Trees", "Bubble Sort"] },
+        { id: 4, text: "What does NLP stand for in AI?", options: ["Natural Language Processing", "Neural Linear Programming", "Natural Learning Process", "Network Language Protocol"] },
+        { id: 5, text: "Which loss function is typically used for binary classification?", options: ["Mean Squared Error", "Binary Cross-Entropy", "Categorical Cross-Entropy", "Hinge Loss"] },
+        { id: 6, text: "What is the purpose of dropout in neural networks?", options: ["Speed up training", "Prevent overfitting", "Increase accuracy", "Data preprocessing"] },
+        { id: 7, text: "Which of these is a popular deep learning framework?", options: ["Jenkins", "Docker", "TensorFlow", "Kubernetes"] },
+        { id: 8, text: "What is the main purpose of feature scaling in machine learning?", options: ["Reduce memory usage", "Normalize input ranges", "Speed up processing", "Increase accuracy"] },
+        { id: 9, text: "Which algorithm is used for recommendation systems?", options: ["Collaborative Filtering", "Bubble Sort", "Binary Search", "Quick Sort"] },
+        { id: 10, text: "What is the purpose of backpropagation in neural networks?", options: ["Data cleaning", "Weight optimization", "Data storage", "Input validation"] }
+      ]
+    },
+    coding: {
+      title: "Coding Challenge",
+      questions: [
+        { id: 1, text: "What will be the output of: console.log(typeof typeof 1)?", options: ["number", "string", "undefined", "object"] },
+        { id: 2, text: "Which method is used to remove the last element from an array in JavaScript?", options: ["pop()", "push()", "shift()", "unshift()"] },
+        { id: 3, text: "What is the time complexity of binary search?", options: ["O(n)", "O(log n)", "O(n²)", "O(n log n)"] },
+        { id: 4, text: "How do you declare a constant in JavaScript?", options: ["let", "var", "const", "constant"] },
+        { id: 5, text: "What is the result of '2' + 2 in JavaScript?", options: ["4", "22", "undefined", "NaN"] },
+        { id: 6, text: "Which hook is used for side effects in React?", options: ["useState", "useEffect", "useContext", "useReducer"] },
+        { id: 7, text: "What does CSS stand for?", options: ["Counter Style Sheets", "Computer Style Sheets", "Cascading Style Sheets", "Creative Style Sheets"] },
+        { id: 8, text: "Which method creates a new array with all elements that pass a test?", options: ["map()", "filter()", "reduce()", "forEach()"] },
+        { id: 9, text: "What is the correct way to check if an object has a property?", options: ["hasOwnProperty()", "includes()", "contains()", "exists()"] },
+        { id: 10, text: "What is the purpose of the 'key' prop in React lists?", options: ["Styling", "Unique identification", "Event handling", "Data binding"] }
+      ]
+    }
+  };
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout | undefined;
     if (examStarted && timeLeft > 0) {
       timer = setInterval(() => {
         setTimeLeft((prev) => {
@@ -26,162 +169,268 @@ const ExamPortal = () => {
     return () => clearInterval(timer);
   }, [examStarted, timeLeft]);
 
-  const formatTime = (seconds: number) => {
+  const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
   const handleAutoSubmit = () => {
-    console.log("Auto-submitting exam...");
+    console.log("Auto-submitting exam...", answers);
   };
 
   const handleStartExam = () => {
     setExamStarted(true);
-    setCurrentSection("mcqs"); // Automatically move to first section
+    setCurrentSection("mcqs");
+    setCurrentQuestionIndex(0);
   };
 
-  const handleSectionChange = (section: string) => {
-    if (!examStarted && section !== "home") {
-      return; // Prevent accessing other sections before exam starts
-    }
+  const handleSectionChange = (section: keyof typeof examSections) => {
+    if (!examStarted && section !== "home") return;
     setCurrentSection(section);
+    setCurrentQuestionIndex(0);
   };
 
-  const isTimeWarning = timeLeft <= 300; // 5 minutes or less
+  const handleQuestionChange = (index: number) => {
+    setCurrentQuestionIndex(index);
+  };
 
-  const renderSectionContent = () => {
-    if (currentSection === "home") {
-      return (
-        <div className="text-center py-12">
-          <h1 className="text-4xl font-bold mb-4 text-blue-600">
-            Welcome to the LNRS Assessment Portal
-          </h1>
-          <div className="max-w-2xl mx-auto">
-            <p className="text-gray-600 mb-8 text-lg">
-              This assessment consists of four sections:
-            </p>
-            <div className="grid grid-cols-2 gap-4 mb-8">
-              <div className="p-4 bg-blue-50 rounded-lg">
-                <BookOpen className="w-6 h-6 text-blue-600 mx-auto mb-2" />
-                <h3 className="font-semibold text-blue-600">MCQs</h3>
-                <p className="text-sm text-gray-600">Multiple choice questions to test your knowledge</p>
-              </div>
-              <div className="p-4 bg-blue-50 rounded-lg">
-                <Brain className="w-6 h-6 text-blue-600 mx-auto mb-2" />
-                <h3 className="font-semibold text-blue-600">Aptitude</h3>
-                <p className="text-sm text-gray-600">Logical reasoning and problem-solving skills</p>
-              </div>
-              <div className="p-4 bg-blue-50 rounded-lg">
-                <RedoDot className="w-6 h-6 text-blue-600 mx-auto mb-2" />
-                <h3 className="font-semibold text-blue-600">AI</h3>
-                <p className="text-sm text-gray-600">Artificial Intelligence concepts and applications</p>
-              </div>
-              <div className="p-4 bg-blue-50 rounded-lg">
-                <Code className="w-6 h-6 text-blue-600 mx-auto mb-2" />
-                <h3 className="font-semibold text-blue-600">Coding</h3>
-                <p className="text-sm text-gray-600">Programming challenges and code implementation</p>
-              </div>
-            </div>
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-8 text-left">
-              <h3 className="font-semibold text-yellow-800 mb-2">Important Instructions:</h3>
-              <ul className="list-disc list-inside text-yellow-700 space-y-1">
-                <li>You have 60 minutes to complete all sections</li>
-                <li>Each section must be completed in order</li>
-                <li>You cannot return to previous sections</li>
-                <li>Ensure stable internet connection before starting</li>
-              </ul>
-            </div>
-            {!examStarted && (
-              <button
-                onClick={handleStartExam}
-                className="bg-blue-600 text-white px-8 py-3 rounded-full hover:bg-blue-700
-                  transition-all hover:scale-105 active:scale-95 shadow-md text-lg"
-              >
-                Begin Assessment
-              </button>
-            )}
-          </div>
-        </div>
-      );
+  const handleNextQuestion = () => {
+    if (currentQuestionIndex < examSections[currentSection].questions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+    } else if (Object.keys(examSections).indexOf(currentSection) < Object.keys(examSections).length - 1) {
+      const sections = Object.keys(examSections);
+      const nextSection = sections[sections.indexOf(currentSection) + 1];
+      setCurrentSection(nextSection);
+      setCurrentQuestionIndex(0);
     }
-
-    return (
-      <div>
-        <h2 className="text-2xl font-bold mb-6 text-blue-600">
-          {currentSection.charAt(0).toUpperCase() + currentSection.slice(1)}
-        </h2>
-        {isTimeWarning && (
-          <div className="mb-4 bg-red-50 text-red-600 p-4 rounded-lg border border-red-200">
-            Warning: Less than 5 minutes remaining!
-          </div>
-        )}
-        <div className="p-4 bg-gray-50 rounded-lg">
-          <p className="text-gray-600">
-            Content for {currentSection} section will be displayed here.
-          </p>
-        </div>
-      </div>
-    );
   };
+
+  const handlePreviousQuestion = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(currentQuestionIndex - 1);
+    } else if (Object.keys(examSections).indexOf(currentSection) > 0) {
+      const sections = Object.keys(examSections);
+      const prevSection = sections[sections.indexOf(currentSection) - 1];
+      setCurrentSection(prevSection);
+      setCurrentQuestionIndex(examSections[prevSection].questions.length - 1);
+    }
+  };
+
+  const handleAnswerSelect = (questionId: number, answer: string) => {
+    setAnswers(prev => ({
+      ...prev,
+      [`${currentSection}-${questionId}`]: answer
+    }));
+  };
+
+  const isTimeWarning = timeLeft <= 300;
+
+  // const renderQuestionContent = () => {
+  //   if (!examStarted || currentSection === "home") return null;
+
+  //   const currentQuestion = examSections[currentSection].questions[currentQuestionIndex];
+  //   const questionKey = `${currentSection}-${currentQuestion.id}`;
+  //   const selectedAnswer = answers[questionKey];
+
+  //   return (
+  //     <div className="space-y-6">
+  //       <div className="bg-white p-6 rounded-lg shadow-sm">
+  //         <h3 className="text-xl font-semibold mb-4">
+  //           Question {currentQuestionIndex + 1}
+  //         </h3>
+  //         <p className="text-gray-700 text-lg mb-6">{currentQuestion.text}</p>
+
+  //         <div className="space-y-3">
+  //           {currentQuestion.options.map((option, idx) => (
+  //             <button
+  //               key={idx}
+  //               onClick={() => handleAnswerSelect(currentQuestion.id, option)}
+  //               className={`w-full text-left p-4 rounded-lg transition-all ${selectedAnswer === option
+  //                 ? "bg-blue-100 border-blue-500 border-2"
+  //                 : "bg-gray-50 hover:bg-gray-100 border-2 border-transparent"
+  //                 }`}
+  //             >
+  //               {option}
+  //             </button>
+  //           ))}
+  //         </div>
+  //       </div>
+
+  //       <div className="flex justify-between items-center mt-6">
+  //         <button
+  //           onClick={handlePreviousQuestion}
+  //           disabled={currentQuestionIndex === 0 && currentSection === "mcqs"}
+  //           className="flex items-center space-x-2 px-6 py-3 bg-gray-100 rounded-lg hover:bg-gray-200 
+  //             disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+  //         >
+  //           <ArrowLeft className="w-5 h-5" />
+  //           <span>Previous</span>
+  //         </button>
+
+  //         <button
+  //           onClick={handleNextQuestion}
+  //           className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-lg 
+  //             hover:bg-blue-700 transition-all"
+  //         >
+  //           <span>Next</span>
+  //           <ArrowRight className="w-5 h-5" />
+  //         </button>
+  //       </div>
+  //     </div>
+  //   );
+  // };
+
+  // const renderSectionContent = () => {
+  //   if (currentSection === "home") {
+  //     return (
+  //       <div className="text-center py-12">
+  //         <h1 className="text-4xl font-bold mb-4 text-blue-600">
+  //           Welcome to the LNRS Assessment Portal
+  //         </h1>
+  //         {/* ... (rest of the home content remains the same) ... */}
+  //         {!examStarted && (
+  //           <button
+  //             onClick={handleStartExam}
+  //             className="bg-blue-600 text-white px-8 py-3 rounded-full hover:bg-blue-700
+  //               transition-all hover:scale-105 active:scale-95 shadow-md text-lg"
+  //           >
+  //             Begin Assessment
+  //           </button>
+  //         )}
+  //       </div>
+  //     );
+  //   }
+
+  //   return renderQuestionContent();
+  // };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       {/* Header */}
-      <header className="bg-white shadow-md backdrop-blur-sm bg-opacity-90 sticky top-0 z-50">
+      <header className="bg-white dark:bg-gray-800 shadow-md backdrop-blur-sm bg-opacity-90 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <div className="h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold">LT</span>
             </div>
-            <div className="text-xl font-bold text-blue-600">
+            <div className="text-xl font-bold text-blue-600 dark:text-blue-400">
               LNRS Technologies
             </div>
           </div>
 
           <div className="flex items-center space-x-6">
+            {examStarted && (
+              <div className="flex items-center space-x-4">
+                {/* Camera Status */}
+                <div className="flex items-center space-x-2 bg-gray-50 dark:bg-gray-700 px-3 py-2 rounded-full">
+                  {cameraEnabled ? (
+                    <Camera className="w-5 h-5 text-green-600 dark:text-green-400" />
+                  ) : (
+                    <VideoOff className="w-5 h-5 text-red-600 dark:text-red-400" />
+                  )}
+                </div>
+
+                {/* Recording Status */}
+                {isRecording && (
+                  <div className="flex items-center space-x-2 bg-red-50 dark:bg-red-900/30 px-3 py-2 rounded-full">
+                    <div className="w-2 h-2 rounded-full bg-red-600 dark:bg-red-400 animate-pulse" />
+                    <span className="text-red-600 dark:text-red-400 text-sm font-medium">Recording</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {examStarted ? (
-              <div className={`flex items-center space-x-2 ${isTimeWarning ? 'animate-pulse text-red-600' : 'text-blue-600'} 
-                font-mono text-lg px-4 py-2 rounded-full ${isTimeWarning ? 'bg-red-50' : 'bg-blue-50'}`}>
+              <div className={`flex items-center space-x-2 ${isTimeWarning ? 'animate-pulse text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'} 
+                font-mono text-lg px-4 py-2 rounded-full ${isTimeWarning ? 'bg-red-50 dark:bg-red-900/30' : 'bg-blue-50 dark:bg-blue-900/30'}`}>
                 <Timer className="w-5 h-5" />
                 <span>{formatTime(timeLeft)}</span>
               </div>
             ) : (
-              <div className="text-gray-600">
+              <div className="text-gray-600 dark:text-gray-300">
                 Duration: 60 minutes
               </div>
             )}
 
-            <div className="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-full">
-              <Mail className="w-5 h-5 text-gray-600" />
-              <span className="text-gray-600">{userEmail}</span>
+            <div className="flex items-center space-x-2 bg-gray-50 dark:bg-gray-700 px-4 py-2 rounded-full">
+              <Mail className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+              <span className="text-gray-600 dark:text-gray-300">{userEmail}</span>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Main Layout */}
-      <div className="flex flex-1 max-w-7xl mx-auto px-4 py-6 gap-6">
-        {/* Sidebar */}
-        <div className="w-64">
-          <div className="bg-white rounded-lg shadow-lg sticky top-24 p-4">
+      {/* Camera Error Alert */}
+      {cameraError && (
+        <div className="max-w-7xl mx-auto px-4 mt-4">
+          <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg flex items-center space-x-2">
+            <AlertCircle className="h-4 w-4" />
+            <p>{cameraError}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Webcam Preview */}
+      {examStarted && (
+        <div className="fixed top-20 right-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2" style={{ width: '180px' }}>
+            <div className="relative">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full rounded-lg"
+                style={{ height: '120px', objectFit: 'cover' }}
+              />
+              {isRecording && (
+                <div className="absolute top-2 right-2 flex items-center space-x-1 bg-black bg-opacity-50 rounded-full px-2 py-1">
+                  <div className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
+                  <span className="text-xs text-white">REC</span>
+                </div>
+              )}
+            </div>
+            <div className="mt-1 flex items-center justify-between px-1">
+              <div className="flex items-center space-x-1">
+                <Camera className="w-3 h-3 text-gray-600 dark:text-gray-300" />
+                <span className="text-xs text-gray-600 dark:text-gray-300">Camera Preview</span>
+              </div>
+              <div className="flex items-center">
+                {cameraEnabled ? (
+                  <div className="w-2 h-2 rounded-full bg-green-600 dark:bg-green-400" />
+                ) : (
+                  <div className="w-2 h-2 rounded-full bg-red-600 dark:bg-red-400" />
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Three-column Layout */}
+      <div className="flex max-w-7xl mx-auto px-4 py-6">
+        {/* Column 1: Sections Menu */}
+        <div className="w-48 flex-shrink-0">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg sticky top-24 p-4">
             <div className="flex flex-col space-y-2">
               <button
                 onClick={() => handleSectionChange("home")}
                 className={`flex items-center space-x-2 w-full p-3 rounded-lg transition-all
-                  ${currentSection === "home" ? 'bg-blue-50 text-blue-600' : 'hover:bg-gray-50'}`}
+                  ${currentSection === "home" ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'hover:bg-gray-50 dark:hover:bg-gray-700'}`}
               >
                 <Home className="w-5 h-5" />
                 <span className="font-medium">Home</span>
               </button>
 
-              {["mcqs", "aptitude", "ai", "coding"].map((section, index) => (
+              {/* {Object.entries(examSections).map(([section, data], index) => ( */}
+              {Object.entries(examSections).map(([section], index) => (
                 <button
                   key={section}
                   onClick={() => handleSectionChange(section)}
                   disabled={!examStarted}
                   className={`flex items-center space-x-2 w-full p-3 rounded-lg transition-all
-                    ${currentSection === section ? 'bg-blue-50 text-blue-600' : 'hover:bg-gray-50'}
+                    ${currentSection === section ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'hover:bg-gray-50 dark:hover:bg-gray-700'}
                     ${!examStarted ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   {index === 0 && <BookOpen className="w-5 h-5" />}
@@ -189,7 +438,7 @@ const ExamPortal = () => {
                   {index === 2 && <RedoDot className="w-5 h-5" />}
                   {index === 3 && <Code className="w-5 h-5" />}
                   <span className="font-medium">
-                    Section {index + 1}: {section.toUpperCase()}
+                    Section {index + 1}
                   </span>
                 </button>
               ))}
@@ -197,7 +446,7 @@ const ExamPortal = () => {
               {examStarted && (
                 <button
                   onClick={handleAutoSubmit}
-                  className="mt-4 w-full bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700
+                  className="mt-4 w-full bg-blue-600 dark:bg-blue-500 text-white p-3 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600
                     transition-all hover:scale-105 active:scale-95 shadow-md"
                 >
                   Submit Exam
@@ -207,10 +456,103 @@ const ExamPortal = () => {
           </div>
         </div>
 
-        {/* Main Content */}
-        <div className="flex-1">
-          <div className="bg-white rounded-lg shadow-lg p-6 h-full">
-            {renderSectionContent()}
+        {/* Column 2: Question Numbers */}
+        {examStarted && currentSection !== "home" && (
+          <div className="w-32 flex-shrink-0 ml-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg sticky top-24 p-4">
+              <h3 className="font-medium text-gray-600 dark:text-gray-300 mb-3">Questions</h3>
+              <div className="flex flex-col space-y-2">
+                {examSections[currentSection].questions.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => handleQuestionChange(idx)}
+                    className={`p-2 rounded-lg text-sm font-medium transition-all
+                      ${currentQuestionIndex === idx
+                        ? 'bg-blue-600 dark:bg-blue-500 text-white'
+                        : answers[`${currentSection}-${idx + 1}`]
+                          ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400'
+                          : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                  >
+                    Question {idx + 1}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Column 3: Main Content */}
+        <div className="flex-1 ml-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+            {currentSection === "home" ? (
+              <div className="text-center py-12">
+                <h1 className="text-4xl font-bold mb-4 text-blue-600 dark:text-blue-400">
+                  Welcome to the LNRS Assessment Portal
+                </h1>
+                {!examStarted && (
+                  <button
+                    onClick={handleStartExam}
+                    className="bg-blue-600 dark:bg-blue-500 text-white px-8 py-3 rounded-full hover:bg-blue-700 dark:hover:bg-blue-600
+                      transition-all hover:scale-105 active:scale-95 shadow-md text-lg"
+                  >
+                    Begin Assessment
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-6 pr-48">
+                <div className="bg-white dark:bg-gray-800 rounded-lg">
+                  <h3 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-100">
+                    Question {currentQuestionIndex + 1}
+                  </h3>
+                  <p className="text-gray-700 dark:text-gray-300 text-lg mb-6">
+                    {examSections[currentSection].questions[currentQuestionIndex].text}
+                  </p>
+
+                  <div className="space-y-3">
+                    {examSections[currentSection].questions[currentQuestionIndex].options.map((option, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleAnswerSelect(currentQuestionIndex + 1, option)}
+                        className={`w-full text-left p-4 rounded-xl transition-all ${answers[`${currentSection}-${currentQuestionIndex + 1}`] === option
+                          ? "bg-blue-100 dark:bg-blue-900/50 border-blue-500 dark:border-blue-400 border-2"
+                          : "bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 border-2 border-transparent"
+                          }`}
+                      >
+                        <span className="flex items-center space-x-3">
+                          <span className="w-8 h-8 flex items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium">
+                            {String.fromCharCode(65 + idx)}
+                          </span>
+                          <span className="text-gray-800 dark:text-gray-200">{option}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center mt-6">
+                  <button
+                    onClick={handlePreviousQuestion}
+                    disabled={currentQuestionIndex === 0 && currentSection === "mcqs"}
+                    className="flex items-center space-x-2 px-6 py-3 bg-gray-100 dark:bg-gray-700 rounded-lg 
+                      hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                    <span className="text-gray-800 dark:text-gray-200">Previous</span>
+                  </button>
+
+                  <button
+                    onClick={handleNextQuestion}
+                    className="flex items-center space-x-2 px-6 py-3 bg-blue-600 dark:bg-blue-500 text-white rounded-lg 
+                      hover:bg-blue-700 dark:hover:bg-blue-600 transition-all"
+                  >
+                    <span>Next</span>
+                    <ArrowRight className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
