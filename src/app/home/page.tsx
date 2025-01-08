@@ -548,7 +548,7 @@ const ExamPortal = () => {
                 {!examStarted && (
                   <div className="space-y-4">
                     <p className="text-red-600 dark:text-red-400 font-medium">
-                      By clicking "Begin Assessment", you agree to be monitored via webcam throughout the exam duration.
+                    By clicking &quot;Begin Assessment&quot;, you agree to be monitored via webcam throughout the exam duration.
                     </p>
                     <button
                       onClick={handleStartExam}
