@@ -490,14 +490,74 @@ const ExamPortal = () => {
                 <h1 className="text-4xl font-bold mb-4 text-blue-600 dark:text-blue-400">
                   Welcome to the LNRS Assessment Portal
                 </h1>
+
+                <div className="max-w-2xl mx-auto text-left mb-8 space-y-6">
+                  <div className="bg-blue-50 dark:bg-blue-900/30 p-6 rounded-xl">
+                    <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-100">
+                      Important Instructions
+                    </h2>
+                    <ul className="space-y-3 text-gray-700 dark:text-gray-300">
+                      <li className="flex items-start space-x-2">
+                        <span className="text-blue-600 dark:text-blue-400 font-bold">•</span>
+                        <span>Duration: The exam is 60 minutes long. A timer will be displayed at the top of the screen.</span>
+                      </li>
+                      <li className="flex items-start space-x-2">
+                        <span className="text-blue-600 dark:text-blue-400 font-bold">•</span>
+                        <span>Sections: The exam consists of 4 sections - MCQs, Aptitude, AI, and Coding. Each section contains 10 questions.</span>
+                      </li>
+                      <li className="flex items-start space-x-2">
+                        <span className="text-blue-600 dark:text-blue-400 font-bold">•</span>
+                        <span>Navigation: You can move between questions using the Previous/Next buttons or click question numbers directly.</span>
+                      </li>
+                      <li className="flex items-start space-x-2">
+                        <span className="text-blue-600 dark:text-blue-400 font-bold">•</span>
+                        <span>Webcam: Your webcam must be enabled throughout the exam for proctoring purposes.</span>
+                      </li>
+                      <li className="flex items-start space-x-2">
+                        <span className="text-blue-600 dark:text-blue-400 font-bold">•</span>
+                        <span>Browser: Do not close or refresh your browser during the exam. This may result in loss of answers.</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-yellow-50 dark:bg-yellow-900/30 p-6 rounded-xl">
+                    <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-100">
+                      Before You Begin
+                    </h2>
+                    <ul className="space-y-3 text-gray-700 dark:text-gray-300">
+                      <li className="flex items-start space-x-2">
+                        <span className="text-yellow-600 dark:text-yellow-400 font-bold">•</span>
+                        <span>Ensure you have a stable internet connection</span>
+                      </li>
+                      <li className="flex items-start space-x-2">
+                        <span className="text-yellow-600 dark:text-yellow-400 font-bold">•</span>
+                        <span>Check that your webcam is working properly</span>
+                      </li>
+                      <li className="flex items-start space-x-2">
+                        <span className="text-yellow-600 dark:text-yellow-400 font-bold">•</span>
+                        <span>Find a quiet, well-lit place to take the exam</span>
+                      </li>
+                      <li className="flex items-start space-x-2">
+                        <span className="text-yellow-600 dark:text-yellow-400 font-bold">•</span>
+                        <span>Keep your ID proof ready for verification</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+
                 {!examStarted && (
-                  <button
-                    onClick={handleStartExam}
-                    className="bg-blue-600 dark:bg-blue-500 text-white px-8 py-3 rounded-full hover:bg-blue-700 dark:hover:bg-blue-600
+                  <div className="space-y-4">
+                    <p className="text-red-600 dark:text-red-400 font-medium">
+                      By clicking "Begin Assessment", you agree to be monitored via webcam throughout the exam duration.
+                    </p>
+                    <button
+                      onClick={handleStartExam}
+                      className="bg-blue-600 dark:bg-blue-500 text-white px-8 py-3 rounded-full hover:bg-blue-700 dark:hover:bg-blue-600
                       transition-all hover:scale-105 active:scale-95 shadow-md text-lg"
-                  >
-                    Begin Assessment
-                  </button>
+                    >
+                      Begin Assessment
+                    </button>
+                  </div>
                 )}
               </div>
             ) : (
