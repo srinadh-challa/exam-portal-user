@@ -1,11 +1,32 @@
 "use client"
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, ChangeEvent } from "react";
 import { Timer, Home, BookOpen, Brain, Code, Mail, RedoDot, ArrowLeft, ArrowRight, Camera, VideoOff, AlertCircle } from "lucide-react";
 
+import { useRouter } from 'next/navigation';
 type AnswersType = {
   [key: string]: string;
 };
+{/*compiler*/}
+import { ArrowsPointingOutIcon, ArrowsPointingInIcon } from "@heroicons/react/24/solid";
+interface Example {
+  input: string;
+  output: string;
+}
+
+interface Question {
+  title: string;
+  description: string;
+  constraints: string[];
+  examples: Example[];
+}
+
+interface TestCaseResult {
+  status: "correct" | "wrong";
+  actualOutput: string;
+}
+{/*--------*/}
+
 
 const ExamPortal = () => {
   const [timeLeft, setTimeLeft] = useState<number>(60 * 60);
@@ -18,10 +39,32 @@ const ExamPortal = () => {
   const [answers, setAnswers] = useState<AnswersType>({});
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const [isContainerVisible, setIsContainerVisible] = useState(false);
+  const [isSection4Visible, setIsSection4Visible] = useState(true);
+
+  
+  const [code, setCode] = useState<string>("// Start coding here...");
+  const [language, setLanguage] = useState<string>("Python");
+  const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
+  const [output, setOutput] = useState<TestCaseResult[]>([]);
+  const [showOutputSection, setShowOutputSection] = useState<boolean>(false);
+  const router = useRouter()
+
+  // const [currentSection, setCurrentSection] = useState('coding'); // Default to Section 4
+  // const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0); // Default to Question 1
+
   // const [isPreviewExpanded, setIsPreviewExpanded] = useState<boolean>(false);
 
   const userEmail = "sriram.lnrs@gmail.com";
-
+  
+  const [isMinimized, setIsMinimized] = useState<boolean>(false); // State to track minimized state
+  
+    // Function to handle minimize toggle
+    const handleMinimize = (section: string) => {
+      console.log(`Toggling minimize for: ${section}`);
+      setIsMinimized((prev) => !prev); // Toggle the minimized state
+    };
+  
   // const togglePreviewSize = () => {
   //   setIsPreviewExpanded(!isPreviewExpanded);
   // };
@@ -138,16 +181,8 @@ const ExamPortal = () => {
     coding: {
       title: "Coding Challenge",
       questions: [
-        { id: 1, text: "What will be the output of: console.log(typeof typeof 1)?", options: ["number", "string", "undefined", "object"] },
-        { id: 2, text: "Which method is used to remove the last element from an array in JavaScript?", options: ["pop()", "push()", "shift()", "unshift()"] },
-        { id: 3, text: "What is the time complexity of binary search?", options: ["O(n)", "O(log n)", "O(n²)", "O(n log n)"] },
-        { id: 4, text: "How do you declare a constant in JavaScript?", options: ["let", "var", "const", "constant"] },
-        { id: 5, text: "What is the result of '2' + 2 in JavaScript?", options: ["4", "22", "undefined", "NaN"] },
-        { id: 6, text: "Which hook is used for side effects in React?", options: ["useState", "useEffect", "useContext", "useReducer"] },
-        { id: 7, text: "What does CSS stand for?", options: ["Counter Style Sheets", "Computer Style Sheets", "Cascading Style Sheets", "Creative Style Sheets"] },
-        { id: 8, text: "Which method creates a new array with all elements that pass a test?", options: ["map()", "filter()", "reduce()", "forEach()"] },
-        { id: 9, text: "What is the correct way to check if an object has a property?", options: ["hasOwnProperty()", "includes()", "contains()", "exists()"] },
-        { id: 10, text: "What is the purpose of the 'key' prop in React lists?", options: ["Styling", "Unique identification", "Event handling", "Data binding"] }
+        { id: 1, text: "Create a program to manage a library's book collection", options: ["number", "string", "undefined", "object"] },
+        { id: 2, text: "Create a real-time chat application with the following features User Authentication, Real-Time Messaging, Private Messaging", options: ["pop()", "push()", "shift()", "unshift()"] }
       ]
     }
   };
@@ -183,17 +218,26 @@ const ExamPortal = () => {
     setExamStarted(true);
     setCurrentSection("mcqs");
     setCurrentQuestionIndex(0);
-  };
+  };  
 
   const handleSectionChange = (section: keyof typeof examSections) => {
     if (!examStarted && section !== "home") return;
+    if (section === "coding"){
+      setIsContainerVisible(true)
+      setIsSection4Visible(false);
+    }
+    else{setIsContainerVisible(false);
+      setIsSection4Visible(true);
+    }
     setCurrentSection(section);
     setCurrentQuestionIndex(0);
   };
 
+
   const handleQuestionChange = (index: number) => {
     setCurrentQuestionIndex(index);
   };
+
 
   const handleNextQuestion = () => {
     if (currentQuestionIndex < examSections[currentSection].questions.length - 1) {
@@ -304,6 +348,54 @@ const ExamPortal = () => {
 
   //   return renderQuestionContent();
   // };
+  const currentQuestion: Question = {
+    title: "Question 1",
+    description:
+      "What will be the output of: console.log(typeof typeof 1)?",
+    constraints: [
+      "1 <= s.size() <= 10^6",
+      "String s contains only lowercase English alphabets and spaces."
+    ],
+    examples: [
+      { input: '" i like this program very much "', output: '"much very program this like i"' },
+      { input: '" pqr mno "', output: '"mno pqr"' },
+      { input: '" a "', output: '"a"' }
+    ]
+  };
+
+  const testCases = ["Test Case 1", "Test Case 2"];
+  const expectedOutputs = ["much very program this like i", "mno pqr"];
+
+  const handleLanguageChange = (e: ChangeEvent<HTMLSelectElement>) => {
+    setLanguage(e.target.value);
+    setCode(`// Start coding in ${e.target.value.toLowerCase()} here...`);
+  };
+
+  const toggleFullScreen = () => {
+    setIsFullScreen(!isFullScreen);
+  };
+
+  const handleRun = () => {
+    const simulatedOutputs = [
+      "much very program this like i", // Correct simulated output for test case 1
+      "mno pq" // Intentional mistake in the output for test case 2
+    ];
+
+    const results: TestCaseResult[] = simulatedOutputs.map((actualOutput, index) => ({
+      status: actualOutput === expectedOutputs[index] ? "correct" : "wrong",
+      actualOutput
+    }));
+
+    setOutput(results);
+    setShowOutputSection(true);
+  };
+
+  const handleReset = () => {
+    setCode("// Start coding here...");
+    setOutput([]);
+    setShowOutputSection(false);
+  };
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
@@ -338,6 +430,11 @@ const ExamPortal = () => {
                     <span className="text-red-600 dark:text-red-400 text-sm font-medium">Recording</span>
                   </div>
                 )}
+                <div className="z-50 p-2 hover:bg-blue-700 rounded">
+                  <button className="text-4xl font-bold text-red-700 text-white"
+                    onClick={() => handleMinimize("home")}>  {isMinimized ? "+" : "-"}
+                  </button>
+                </div>
               </div>
             )}
 
@@ -373,7 +470,9 @@ const ExamPortal = () => {
 
       {/* Webcam Preview */}
       {examStarted && (
-        <div className="fixed top-20 right-4 z-50">
+        <div className={` duration-500 fixed top-48 ${
+          isMinimized ? "fixed top-20 " : "z-50"
+        } left-4 `}>
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2" style={{ width: '180px' }}>
             <div className="relative">
               <video
@@ -442,14 +541,9 @@ const ExamPortal = () => {
                   </span>
                 </button>
               ))}
-
               {examStarted && (
-                <button
-                  onClick={handleAutoSubmit}
-                  className="mt-4 w-full bg-blue-600 dark:bg-blue-500 text-white p-3 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600
-                    transition-all hover:scale-105 active:scale-95 shadow-md"
-                >
-                  Submit Exam
+                <button onClick={handleAutoSubmit}className="mt-4 w-full bg-blue-600 dark:bg-blue-500 text-white p-3 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600
+                    transition-all hover:scale-105 active:scale-95 shadow-md">Submit
                 </button>
               )}
             </div>
@@ -458,23 +552,23 @@ const ExamPortal = () => {
 
         {/* Column 2: Question Numbers */}
         {examStarted && currentSection !== "home" && (
-          <div className="w-32 flex-shrink-0 ml-4">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg sticky top-24 p-4">
-              <h3 className="font-medium text-gray-600 dark:text-gray-300 mb-3">Questions</h3>
+          <div className="w-15 flex-shrink-0 ml-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg sticky top-24 p-2">
+              <h3 className="font-small text-gray-600 dark:text-gray-300 mb-3">Questions</h3>
               <div className="flex flex-col space-y-2">
                 {examSections[currentSection].questions.map((_, idx) => (
                   <button
                     key={idx}
                     onClick={() => handleQuestionChange(idx)}
-                    className={`p-2 rounded-lg text-sm font-medium transition-all
+                    className={`p-2 rounded-lg text-sm font-medium w-16 transition-all
                       ${currentQuestionIndex === idx
-                        ? 'bg-blue-600 dark:bg-blue-500 text-white'
+                        ? 'bg-blue-600 dark:bg-blue-500 text-white w-16'
                         : answers[`${currentSection}-${idx + 1}`]
                           ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400'
                           : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
                       }`}
                   >
-                    Question {idx + 1}
+                    {/* Question*/} {idx + 1} 
                   </button>
                 ))}
               </div>
@@ -484,6 +578,7 @@ const ExamPortal = () => {
 
         {/* Column 3: Main Content */}
         <div className="flex-1 ml-4">
+        {isSection4Visible && (
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
             {currentSection === "home" ? (
               <div className="text-center py-12">
@@ -561,59 +656,184 @@ const ExamPortal = () => {
                 )}
               </div>
             ) : (
-              <div className="space-y-6 pr-48">
-                <div className="bg-white dark:bg-gray-800 rounded-lg">
-                  <h3 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-100">
-                    Question {currentQuestionIndex + 1}
-                  </h3>
-                  <p className="text-gray-700 dark:text-gray-300 text-lg mb-6">
-                    {examSections[currentSection].questions[currentQuestionIndex].text}
-                  </p>
-
-                  <div className="space-y-3">
-                    {examSections[currentSection].questions[currentQuestionIndex].options.map((option, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => handleAnswerSelect(currentQuestionIndex + 1, option)}
-                        className={`w-full text-left p-4 rounded-xl transition-all ${answers[`${currentSection}-${currentQuestionIndex + 1}`] === option
-                          ? "bg-blue-100 dark:bg-blue-900/50 border-blue-500 dark:border-blue-400 border-2"
-                          : "bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 border-2 border-transparent"
-                          }`}
-                      >
-                        <span className="flex items-center space-x-3">
-                          <span className="w-8 h-8 flex items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium">
-                            {String.fromCharCode(65 + idx)}
-                          </span>
-                          <span className="text-gray-800 dark:text-gray-200">{option}</span>
-                        </span>
+                  <div className="space-y-6">
+                    <div>
+                      <div className="bg-white dark:bg-gray-800 rounded-lg">
+                      <h3 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-100">
+                        Question {currentQuestionIndex + 1}
+                      </h3>
+                      <p className="text-gray-700 dark:text-gray-300 text-lg mb-6">
+                      {examSections[currentSection].questions[currentQuestionIndex].text}
+                      </p>
+                      <div className="space-y-3">
+                      {examSections[currentSection].questions[currentQuestionIndex].options.map((option, idx) => (
+                      <button key={idx} onClick={() => handleAnswerSelect(currentQuestionIndex + 1, option)}
+                      className={`w-full text-left p-4 rounded-xl transition-all ${answers[`${currentSection}-${currentQuestionIndex + 1}`] === option
+                      ? "bg-blue-100 dark:bg-blue-900/50 border-blue-500 dark:border-blue-400 border-2"
+                      : "bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 border-2 border-transparent"}`}>
+                      <span className="flex items-center space-x-3">
+                      <span className="w-8 h-8 flex items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium">
+                      {String.fromCharCode(65 + idx)}
+                      </span>
+                      <span className="text-gray-800 dark:text-gray-200">{option}</span>
+                      </span>
                       </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-center mt-6">
-                  <button
+                      ))}
+                      </div>
+                      </div>                 
+                    </div>
+                    <div className="flex justify-between items-center mt-6">
+                    <button
                     onClick={handlePreviousQuestion}
                     disabled={currentQuestionIndex === 0 && currentSection === "mcqs"}
                     className="flex items-center space-x-2 px-6 py-3 bg-gray-100 dark:bg-gray-700 rounded-lg 
                       hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                  >
+                    >
                     <ArrowLeft className="w-5 h-5" />
                     <span className="text-gray-800 dark:text-gray-200">Previous</span>
-                  </button>
+                    </button>
 
-                  <button
+                    <button
                     onClick={handleNextQuestion}
                     className="flex items-center space-x-2 px-6 py-3 bg-blue-600 dark:bg-blue-500 text-white rounded-lg 
                       hover:bg-blue-700 dark:hover:bg-blue-600 transition-all"
-                  >
+                    >
                     <span>Next</span>
                     <ArrowRight className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-            )}
+                    </button>
+                    </div>
+                  </div>
+                )}
           </div>
+        )}
+                      {isContainerVisible && (
+                        <div>
+                        <div className={`flex ${isFullScreen ? "h-screen" : "flex-row h-screen"} bg-gray-800`} >
+                          {!isFullScreen && (
+                            <div className="w-1/2 bg-gray-800 shadow-lg rounded p-6 overflow-auto">
+                            <div className="flex">
+                              <div className="bg-white dark:bg-gray-800 rounded-lg">
+                              <h3 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-100">
+                                Question {currentQuestionIndex + 1}
+                              </h3>
+                              <p className="text-gray-700 dark:text-gray-300 text-lg mb-6">
+                              {examSections[currentSection].questions[currentQuestionIndex].text}
+                              </p>
+                              
+                              </div>                 
+                            </div>
+                            </div>
+                          )}
+                    
+                          <div
+                            className={`${
+                              isFullScreen ? "w-full" : "w-1/2"
+                            } flex flex-col bg-gray-900 text-gray-300 rounded-md overflow-hidden`}
+                          >
+                            <div className="p-3 bg-gray-800 flex justify-between items-center text-sm text-gray-400">
+                              <div className="flex items-center space-x-2">
+                                <label htmlFor="language" className="text-gray-300">
+                                  Language:
+                                </label>
+                                <select
+                                  id="language"
+                                  value={language}
+                                  onChange={handleLanguageChange}
+                                  className="bg-gray-700 text-gray-300 px-2 py-1 rounded outline-none"
+                                >
+                                  <option value="Python">Python</option>
+                                  <option value="Java">Java</option>
+                                  <option value="C">C</option>
+                                  <option value="C++">C++</option>
+                                  <option value="JavaScript">JavaScript</option>
+                                  <option value="R">R</option>
+                                  <option value="SQL">SQL</option>
+                                </select>
+                              </div>
+                    
+                              <button
+                                onClick={toggleFullScreen}
+                                className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-sm flex items-center"
+                              >
+                                {isFullScreen ? (
+                                  <ArrowsPointingInIcon className="h-5 w-5" />
+                                ) : (
+                                  <ArrowsPointingOutIcon className="h-5 w-5" />
+                                )}
+                              </button>
+                            </div>
+                    
+                            <textarea
+                              className="flex-grow bg-gray-900 text-gray-300 p-4 font-mono text-sm outline-none"
+                              value={code}
+                              onChange={(e) => setCode(e.target.value)}
+                            ></textarea>
+                    
+                            {showOutputSection && (
+                              <div className="p-3 bg-gray-800">
+                                <h3 className="text-gray-400 text-sm font-semibold mb-2">Output</h3>
+                                {output.map((result, index) => (
+                                  <div key={index} className="flex items-center space-x-4 mb-3">
+                                    <div className="w-1/3 bg-gray-700 text-gray-300 p-2 rounded">
+                                      {`Test Case ${index + 1}`}
+                                    </div>
+                                    <div className="w-1/3 bg-gray-700 text-gray-300 p-2 rounded">
+                                      {`Expected: ${expectedOutputs[index]}`}
+                                    </div>
+                                    <div className="w-1/3 bg-gray-700 text-gray-300 p-2 rounded flex items-center">
+                                      {`Actual: ${result.actualOutput}`}
+                                      {result.status === "correct" ? (
+                                        <span className="text-green-500 ml-2">✅</span>
+                                      ) : (
+                                        <span className="text-red-500 ml-2">❌</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                    
+                            <div className="flex p-3 bg-gray-800 space-x-2">
+                              <button
+                                onClick={handleRun}
+                                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm"
+                              >
+                                Run
+                              </button>
+                              {/* <button className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded text-sm">
+                                Submit
+                              </button> */}
+                              <button
+                                onClick={handleReset}
+                                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm"
+                              >
+                                Reset
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex justify-between items-center mt-6">
+                    <button
+                    onClick={handlePreviousQuestion}
+                    disabled={currentQuestionIndex === 0 && currentSection === "mcqs"}
+                    className="flex items-center space-x-2 px-6 py-3 bg-gray-100 dark:bg-gray-700 rounded-lg 
+                      hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    >
+                    <ArrowLeft className="w-5 h-5" />
+                    <span className="text-gray-800 dark:text-gray-200">Previous</span>
+                    </button>
+
+                    <button
+                    onClick={handleNextQuestion}
+                    className="flex items-center space-x-2 px-6 py-3 bg-blue-600 dark:bg-blue-500 text-white rounded-lg 
+                      hover:bg-blue-700 dark:hover:bg-blue-600 transition-all"
+                    >
+                    <span>Next</span>
+                    <ArrowRight className="w-5 h-5" />
+                    </button>
+                    </div>
+                        </div>
+                    )}             
         </div>
       </div>
     </div>
