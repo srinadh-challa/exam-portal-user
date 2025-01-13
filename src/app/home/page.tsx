@@ -3,23 +3,12 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from "react";
 import { Timer, Home, BookOpen, Brain, Code, Mail, RedoDot, ArrowLeft, ArrowRight, Camera, VideoOff, AlertCircle } from "lucide-react";
 
-import { useRouter } from 'next/navigation';
 type AnswersType = {
   [key: string]: string;
 };
-{/*compiler*/}
 import { ArrowsPointingOutIcon, ArrowsPointingInIcon } from "@heroicons/react/24/solid";
-interface Example {
-  input: string;
-  output: string;
-}
 
-interface Question {
-  title: string;
-  description: string;
-  constraints: string[];
-  examples: Example[];
-}
+
 
 interface TestCaseResult {
   status: "correct" | "wrong";
@@ -48,7 +37,6 @@ const ExamPortal = () => {
   const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
   const [output, setOutput] = useState<TestCaseResult[]>([]);
   const [showOutputSection, setShowOutputSection] = useState<boolean>(false);
-  const router = useRouter()
 
   // const [currentSection, setCurrentSection] = useState('coding'); // Default to Section 4
   // const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0); // Default to Question 1
@@ -348,22 +336,7 @@ const ExamPortal = () => {
 
   //   return renderQuestionContent();
   // };
-  const currentQuestion: Question = {
-    title: "Question 1",
-    description:
-      "What will be the output of: console.log(typeof typeof 1)?",
-    constraints: [
-      "1 <= s.size() <= 10^6",
-      "String s contains only lowercase English alphabets and spaces."
-    ],
-    examples: [
-      { input: '" i like this program very much "', output: '"much very program this like i"' },
-      { input: '" pqr mno "', output: '"mno pqr"' },
-      { input: '" a "', output: '"a"' }
-    ]
-  };
-
-  const testCases = ["Test Case 1", "Test Case 2"];
+  
   const expectedOutputs = ["much very program this like i", "mno pqr"];
 
   const handleLanguageChange = (e: ChangeEvent<HTMLSelectElement>) => {
