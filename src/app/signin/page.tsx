@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { User, Lock, ArrowRight, Loader2 } from "lucide-react"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://lnrs-exam-and-admin-backend.onrender.com/api"
 
 const SignInPage = () => {
   const router = useRouter()
