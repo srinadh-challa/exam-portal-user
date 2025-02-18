@@ -1,57 +1,58 @@
-"use client";
+"use client"
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { User, Lock, ArrowRight, Loader2 } from 'lucide-react';
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { User, Lock, ArrowRight, Loader2 } from "lucide-react"
 
-const VALID_CREDENTIALS = {
-  email: 'sriram.lnrs@gmail.com',
-  password: 'sriram123'
-};
-
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
 
 const SignInPage = () => {
-  const router = useRouter();
-  const [formData, setFormData] = useState({
-    email: '',
-    password: ''
-  });
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter()
+  const [formData, setFormData] = useState({ email: "", password: "" })
+  const [error, setError] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-    setError('');
-  };
+    setFormData({ ...formData, [e.target.name]: e.target.value })
+    setError("")
+  }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsLoading(true);
-    
-    // Simulate network delay for better UX
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    if (formData.email === VALID_CREDENTIALS.email && 
-        formData.password === VALID_CREDENTIALS.password) {
-      router.push('/home');
-    } else {
-      setError('Invalid email or password');
-      setIsLoading(false);
+    e.preventDefault()
+    setIsLoading(true)
+    setError("")
+
+    try {
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.token) {
+        localStorage.setItem("token", data.token)
+        localStorage.setItem("userEmail", formData.email)
+        router.push("/home") // ✅ Ensure "/home" exists in your app!
+      } else {
+        setError(data.message || "Invalid email or password")
+      }
+    } catch (err) {
+      console.error("Login error:", err) // ✅ Fix: Now 'err' is used, so no TypeScript error
+      setError("An error occurred. Please try again.")
+    } finally {
+      setIsLoading(false)
     }
-  };
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-600 via-purple-600 to-pink-500 p-4">
       <div className="relative w-full max-w-md">
-        {/* Decorative background elements */}
         <div className="absolute -top-8 -left-8 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
         <div className="absolute -bottom-8 -right-8 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
-        
+
         <div className="relative bg-white/95 backdrop-blur-xl p-8 rounded-2xl shadow-2xl transform transition-all duration-300 hover:scale-[1.02]">
-          {/* Logo/Header */}
           <div className="text-center mb-8">
             <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
               <User className="h-8 w-8 text-white" />
@@ -62,13 +63,9 @@ const SignInPage = () => {
             <p className="text-gray-600 mt-2">Sign in to your account</p>
           </div>
 
-          {/* Sign In Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Email Field */}
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">
-                Email Address
-              </label>
+              <label className="block text-sm font-medium text-gray-700">Email Address</label>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <User className="h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
@@ -85,11 +82,8 @@ const SignInPage = () => {
               </div>
             </div>
 
-            {/* Password Field */}
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">
-                Password
-              </label>
+              <label className="block text-sm font-medium text-gray-700">Password</label>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Lock className="h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
@@ -106,14 +100,8 @@ const SignInPage = () => {
               </div>
             </div>
 
-            {/* Error Message */}
-            {error && (
-              <div className="text-red-500 text-sm text-center bg-red-50 p-2 rounded-lg">
-                {error}
-              </div>
-            )}
+            {error && <div className="text-red-500 text-sm text-center bg-red-50 p-2 rounded-lg">{error}</div>}
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={isLoading}
@@ -128,21 +116,11 @@ const SignInPage = () => {
                 </>
               )}
             </button>
-
-            {/* Links */}
-            {/* <div className="mt-6 flex items-center justify-between text-sm">
-              <button type="button" className="text-blue-600 hover:text-blue-500 transition-colors">
-                Forgot password?
-              </button>
-              <button type="button" className="text-blue-600 hover:text-blue-500 transition-colors">
-                Create account
-              </button>
-            </div> */}
           </form>
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default SignInPage;
+export default SignInPage
