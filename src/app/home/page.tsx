@@ -20,7 +20,7 @@ import { toast, ToastContainer } from "react-toastify"
 import "react-toastify/dist/ReactToastify.css"
 import MonacoEditor from "@monaco-editor/react"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://lnrs-exam-and-admin-backend.onrender.com/api"
 
 interface Question {
   _id: string
