@@ -20,7 +20,7 @@ import { toast, ToastContainer } from "react-toastify"
 import "react-toastify/dist/ReactToastify.css"
 import MonacoEditor from "@monaco-editor/react"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://lnrs-exam-and-admin-backend.onrender.com/api"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
 
 interface Question {
   _id: string
@@ -256,35 +256,33 @@ function ExamPortal() {
     }
   }, [])
 
-  // Fetch questions
+  // Update the fetchQuestions function
   useEffect(() => {
     const fetchQuestions = async () => {
       try {
         setIsLoading(true)
-        const token = localStorage.getItem("token")
-        if (!token) {
-          throw new Error("No authentication token found")
-        }
 
-        const response = await axios.get(`${API_URL}/questions/user`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        const questions = response.data.data
+        // Make the API call without requiring authentication token
+        const response = await axios.get(`${API_URL}/questions/user`)
+
+        // Transform the response data into the required format
+        const questionsData = response.data.data
 
         const sections: Record<string, ExamSection> = {
-          mcqs: { title: "Multiple Choice Questions", questions: [] },
-          aptitude: { title: "Aptitude Test", questions: [] },
-          ai: { title: "Artificial Intelligence", questions: [] },
-          coding: { title: "Coding Challenge", questions: [] },
+          mcqs: { title: "Multiple Choice Questions", questions: questionsData.mcqs || [] },
+          aptitude: { title: "Aptitude Test", questions: questionsData.aptitude || [] },
+          ai: { title: "Artificial Intelligence", questions: questionsData.ai || [] },
+          coding: { title: "Coding Challenge", questions: questionsData.coding || [] },
         }
 
-        questions.forEach((question: Question) => {
-          if (sections[question.section]) {
-            sections[question.section].questions.push(question)
-          }
-        })
-
         setExamSections(sections)
+
+        // Initialize progress tracking
+        const newProgress: Record<string, number> = {}
+        Object.keys(sections).forEach((section) => {
+          newProgress[section] = 0
+        })
+        setProgress(newProgress)
       } catch (error) {
         console.error("Error fetching questions:", error)
         toast.error("Failed to load questions. Please try again.")
@@ -293,25 +291,32 @@ function ExamPortal() {
       }
     }
 
+    // Call fetchQuestions when component mounts
     fetchQuestions()
-  }, [])
+  }, []) // Empty dependency array means this runs once when component mounts
 
-  // Timer effect
+  // Update the timer effect to fix the 'prev' unused variable warning
   useEffect(() => {
     let timer: NodeJS.Timeout | undefined
+
     if (examStarted && timeLeft > 0) {
       timer = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
+        setTimeLeft((currentTime) => {
+          if (currentTime <= 1) {
             clearInterval(timer)
             handleAutoSubmit()
             return 0
           }
-          return prev - 1
+          return currentTime - 1
         })
       }, 1000)
     }
-    return () => clearInterval(timer)
+
+    return () => {
+      if (timer) {
+        clearInterval(timer)
+      }
+    }
   }, [examStarted, timeLeft, handleAutoSubmit])
 
   // Check camera permissions
@@ -424,6 +429,7 @@ function ExamPortal() {
         throw new Error("Camera and microphone permissions are required to start the exam.")
       }
 
+      // Start the exam session
       const response = await axios.post(
         `${API_URL}/exams/start`,
         { duration: 60 },
@@ -440,9 +446,10 @@ function ExamPortal() {
         setExamStarted(true)
         setCurrentSection("mcqs")
         await initializeCamera()
-
-        // Call toggleFullScreenExam here
         await toggleFullScreenExam()
+
+        // Questions will be fetched automatically by the useEffect hook
+        // when examStarted changes to true
       } else {
         throw new Error("Invalid response from server")
       }
@@ -497,6 +504,12 @@ function ExamPortal() {
         setAnswers((prev) => ({
           ...prev,
           [questionId]: answer,
+        }))
+
+        // Update progress for the current section
+        setProgress((prev) => ({
+          ...prev,
+          [currentSection]: Object.keys(answers).filter((key) => key.startsWith(currentSection)).length + 1,
         }))
       } else {
         throw new Error("Unexpected response from server")
@@ -797,6 +810,18 @@ function ExamPortal() {
     window.addEventListener("keydown", handleKeyPress)
     return () => window.removeEventListener("keydown", handleKeyPress)
   }, [handleNextQuestion, handlePreviousQuestion])
+
+  // Add this useEffect to handle loading timeout
+  useEffect(() => {
+    if (isLoading) {
+      const timeoutId = setTimeout(() => {
+        setIsLoading(false)
+        toast.error("Loading timed out. Please refresh and try again.")
+      }, 10000) // 10 seconds timeout
+
+      return () => clearTimeout(timeoutId)
+    }
+  }, [isLoading])
 
   if (isMobileDevice) {
     return (
