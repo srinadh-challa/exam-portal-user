@@ -1615,73 +1615,28 @@ if __name__ == "__main__":
                   <h2 className="text-xl font-bold text-white mb-4">{selectedCodingQuestion.text}</h2>
                   <div className="space-y-6 text-gray-300">
                     {selectedCodingQuestion.testCases && (
-  <div>
-    <h3 className="text-lg font-semibold mb-2">Test Cases</h3>
-    <div className="space-y-4">
-      {selectedCodingQuestion.testCases?.map((testCase, index) => (
-        <div key={index} className="bg-gray-700 p-4 rounded-lg">
-          <div className="font-medium text-lg mb-2">Sample Test Case {index + 1}</div>
-          
-          {language === "sql" && isSchoolChildrenSetup(testCase.input) ? (
-            <div className="space-y-4">
-              <div>
-                <span className="text-blue-400 font-medium">Schema:</span>
-                <div className="mt-2 overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-800">
-                      <tr>
-                        {SAMPLE_TABLE_STRUCTURE.map((column) => (
-                          <th key={column} className="px-4 py-2 text-left text-gray-400">
-                            {column}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {SAMPLE_TABLE_DATA.map((row, rowIndex) => (
-                        <tr 
-                          key={rowIndex}
-                          className={rowIndex % 2 === 0 ? "bg-gray-900" : "bg-gray-800"}
-                        >
-                          {SAMPLE_TABLE_STRUCTURE.map((column) => (
-                            <td key={column} className="px-4 py-2 text-gray-300">
-                              {row[column as keyof typeof row]}
-                            </td>
+                      <div>
+                        <h3 className="text-lg font-semibold mb-2">Test Cases</h3>
+                        {/* Replace the existing test cases mapping with this: */}
+                        <div className="space-y-4">
+                          {selectedCodingQuestion.testCases?.slice(0, 1).map((testCase, index) => (
+                            <div key={index}>
+                              <div className="font-medium text-lg mb-2">Sample Test Case</div>
+                              <div className="space-y-2">
+                                <div>
+                                  <span className="text-blue-400 font-medium">Input:</span>
+                                  <pre className="mt-1 font-mono text-sm">{testCase.input}</pre>
+                                </div>
+                                <div>
+                                  <span className="text-green-400 font-medium">Expected Output:</span>
+                                  <pre className="mt-1 font-mono text-sm">{testCase.output}</pre>
+                                </div>
+                              </div>
+                            </div>
                           ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-              <div>
-                <span className="text-green-400 font-medium">Expected Query Result:</span>
-                <pre className="mt-2 p-3 bg-gray-800 rounded font-mono text-sm">
-                  {testCase.output}
-                </pre>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <div>
-                <span className="text-blue-400 font-medium">Input:</span>
-                <pre className="mt-1 font-mono text-sm bg-gray-800 p-2 rounded">
-                  {testCase.input}
-                </pre>
-              </div>
-              <div>
-                <span className="text-green-400 font-medium">Expected Output:</span>
-                <pre className="mt-1 font-mono text-sm bg-gray-800 p-2 rounded">
-                  {testCase.output}
-                </pre>
-              </div>
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  </div>
-)}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
