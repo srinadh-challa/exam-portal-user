@@ -14,7 +14,6 @@ import {
   AlertCircle,
   Camera,
   ArrowRight,
-  Database,
 } from "lucide-react"
 import { ArrowsPointingOutIcon, ArrowsPointingInIcon } from "@heroicons/react/24/solid"
 import { toast, ToastContainer } from "react-toastify"
@@ -96,11 +95,6 @@ function ExamPortal() {
   const editorDragHandleRef = useRef<HTMLDivElement>(null)
   const [viewedQuestions, setViewedQuestions] = useState<Set<string>>(new Set())
 
-  // Add state for SQL data display
-  const [sqlDataResult, setSqlDataResult] = useState<any[] | null>(null)
-  const [sqlTableStructure, setSqlTableStructure] = useState<string[]>([])
-  const [showDataViewer, setShowDataViewer] = useState<boolean>(false)
-
   const [progress, setProgress] = useState<Record<string, number>>({
     mcqs: 0,
     aptitude: 0,
@@ -109,19 +103,6 @@ function ExamPortal() {
   })
   const [questionPanelWidth, setQuestionPanelWidth] = useState(33.33)
   const [isPanelDragging, setIsPanelDragging] = useState(false)
-  const SAMPLE_TABLE_STRUCTURE = ["id", "name", "age", "grade", "gender", "email", "school_name"];
-const SAMPLE_TABLE_DATA = [
-  { id: 1, name: "Alice Johnson", age: 10, grade: "5th Grade", gender: "Female", email: "alice@email.com", school_name: "Springfield Elementary" },
-  { id: 2, name: "Bob Smith", age: 12, grade: "7th Grade", gender: "Male", email: "bob@email.com", school_name: "Riverdale School" },
-  { id: 3, name: "Charlie Brown", age: 9, grade: "4th Grade", gender: "Male", email: "charlie@email.com", school_name: "Greenwood Primary" },
-  { id: 4, name: "Diana Prince", age: 11, grade: "6th Grade", gender: "Female", email: "diana@email.com", school_name: "Hilltop Academy" },
-  { id: 5, name: "Ethan Hunt", age: 13, grade: "8th Grade", gender: "Male", email: "ethan@email.com", school_name: "Springfield Elementary" }
-];
-
-// Add this helper function
-const isSchoolChildrenSetup = (input: string) => {
-  return input.includes("CREATE TABLE SchoolChildren") && input.includes("INSERT INTO SchoolChildren");
-};
 
   // Add these drag handlers for panel divider
   const handlePanelDragStart = (e: React.MouseEvent) => {
@@ -734,110 +715,69 @@ const isSchoolChildrenSetup = (input: string) => {
     }
   }
 
-  // Run code with enhanced SQL support
-  const PISTON_API_URL = "https://emkc.org/api/v2/piston"
+  // Run code
+  const PISTON_API_URL = "https://emkc.org/api/v2/piston";
 
   const handleRun = async () => {
-    if (!selectedCodingQuestion) return
-
-    setCompilationResult(null)
-    setShowOutputSection(true)
-    setTestResults([])
-    setSqlDataResult(null)
-    setSqlTableStructure([])
-    setShowDataViewer(false)
-
+    if (!selectedCodingQuestion) return;
+  
+    setCompilationResult(null);
+    setShowOutputSection(true);
+    setTestResults([]);
     setTestCaseProgress({
       total: selectedCodingQuestion.testCases?.length || 0,
       passed: 0,
       running: true,
-    })
-
+    });
+  
     try {
-      const testCases = selectedCodingQuestion.testCases || []
-      const results: TestCaseResult[] = []
-
+      const testCases = selectedCodingQuestion.testCases || [];
+      const results: TestCaseResult[] = [];
+  
       for (let i = 0; i < testCases.length; i++) {
-        setCurrentTestCase(i)
-        const testCase = testCases[i]
-        let response
-
+        setCurrentTestCase(i);
+        const testCase = testCases[i];
+        let response;
+  
         if (language === "sql") {
-          // Enhanced Python script for SQL with better formatting and table structure extraction
+          // Construct Python script that executes SQLite operations
           const pythonScript = `
-import sqlite3
-import json
-import sys
-
-def main():
-    # Create in-memory database
-    conn = sqlite3.connect(':memory:')
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    
-    try:
-        # Execute setup SQL from test case input
-        cursor.executescript("""${testCase.input.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n")}""")
-    except Exception as e:
-        return json.dumps({
-            "error": f"Setup Error: {str(e)}",
-            "data": None,
-            "columns": None
-        })
-    
-    try:
-        # Execute user's SQL query
-        cursor.execute("""${code.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n")}""")
-        
-        # Get results if query returns data
-        if cursor.description:
-            columns = [col[0] for col in cursor.description]
-            rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
-            return json.dumps({
-                "error": None,
-                "data": rows,
-                "columns": columns
-            })
-        else:
-            # For non-SELECT queries that modify data, try to show affected tables
-            tables_query = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
-            cursor.execute(tables_query)
-            tables = [row[0] for row in cursor.fetchall()]
-            
-            all_data = {}
-            all_columns = {}
-            
-            for table in tables:
-                try:
-                    cursor.execute(f"SELECT * FROM {table} LIMIT 10")
-                    if cursor.description:
-                        table_columns = [col[0] for col in cursor.description]
-                        table_rows = [dict(zip(table_columns, row)) for row in cursor.fetchall()]
-                        all_data[table] = table_rows
-                        all_columns[table] = table_columns
-                except:
-                    pass
-            
-            return json.dumps({
-                "error": None,
-                "message": "Query executed successfully (no direct results)",
-                "tables": all_data,
-                "table_columns": all_columns
-            })
-    except Exception as e:
-        return json.dumps({
-            "error": f"Execution Error: {str(e)}",
-            "data": None,
-            "columns": None
-        })
-    finally:
-        conn.close()
-
-if __name__ == "__main__":
-    result = main()
-    print(result)
-          `.trim()
-
+  import sqlite3
+  import json
+  import sys
+  
+  def main():
+      # Create in-memory database
+      conn = sqlite3.connect(':memory:')
+      cursor = conn.cursor()
+      
+      try:
+          # Execute setup SQL from test case input
+          cursor.executescript("""${testCase.input.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n')}""")
+      except Exception as e:
+          return f"Setup Error: {str(e)}"
+      
+      try:
+          # Execute user's SQL query
+          cursor.execute("""${code.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n')}""")
+          
+          # Get results if query returns data
+          if cursor.description:
+              columns = [col[0] for col in cursor.description]
+              rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+              return json.dumps(rows, indent=2)
+          else:
+              return "Query executed successfully (no results)"
+      except Exception as e:
+          return f"Execution Error: {str(e)}"
+      finally:
+          conn.close()
+  
+  if __name__ == "__main__":
+      result = main()
+      print(result)
+          `.trim();
+  
           response = await axios.post(
             `${PISTON_API_URL}/execute`,
             {
@@ -845,88 +785,8 @@ if __name__ == "__main__":
               version: "3.10",
               files: [{ content: pythonScript }],
             },
-            { timeout: 10000 },
-          )
-
-          const rawOutput = response.data.run.output.trim()
-
-          try {
-            const sqlResult = JSON.parse(rawOutput)
-
-            if (sqlResult.error) {
-              // Handle SQL execution error
-              results.push({
-                status: "wrong",
-                actualOutput: sqlResult.error,
-                expectedOutput: testCase.output,
-                testCaseNumber: i + 1,
-              })
-
-              setTestResults([...results])
-              setTestCaseProgress((prev) => ({
-                ...prev,
-                passed: results.filter((r) => r.status === "correct").length,
-              }))
-              break
-            }
-
-            // For SELECT queries that return data
-            if (sqlResult.data) {
-              setSqlDataResult(sqlResult.data)
-              setSqlTableStructure(sqlResult.columns || [])
-              setShowDataViewer(true)
-
-              // Compare with expected output
-              const expectedOutput = JSON.parse(testCase.output)
-              const outputEquals = JSON.stringify(sqlResult.data) === JSON.stringify(expectedOutput)
-
-              results.push({
-                status: outputEquals ? "correct" : "wrong",
-                actualOutput: JSON.stringify(sqlResult.data, null, 2),
-                expectedOutput: testCase.output,
-                testCaseNumber: i + 1,
-                executionTime: response.data.run.time * 1000 || 0,
-              })
-            }
-            // For non-SELECT queries
-            else if (sqlResult.tables) {
-              // Display affected tables
-              const tableData = []
-              for (const [tableName, rows] of Object.entries(sqlResult.tables)) {
-                tableData.push({ tableName, rows, columns: sqlResult.table_columns[tableName] })
-              }
-
-              setSqlDataResult(tableData)
-              setShowDataViewer(true)
-
-              // We still need to compare with expected output
-              let outputMatches = false
-              try {
-                const expectedData = JSON.parse(testCase.output)
-                // Compare table structure and data
-                outputMatches = JSON.stringify(tableData) === JSON.stringify(expectedData)
-              } catch {
-                // If expected output isn't valid JSON, try direct string comparison
-                outputMatches = JSON.stringify(tableData) === testCase.output
-              }
-
-              results.push({
-                status: outputMatches ? "correct" : "wrong",
-                actualOutput: JSON.stringify(tableData, null, 2),
-                expectedOutput: testCase.output,
-                testCaseNumber: i + 1,
-                executionTime: response.data.run.time * 1000 || 0,
-              })
-            }
-          } catch (parseError) {
-            // Handle JSON parsing error
-            results.push({
-              status: "wrong",
-              actualOutput: `Error parsing result: ${rawOutput}`,
-              expectedOutput: testCase.output,
-              testCaseNumber: i + 1,
-            })
-          }
+            { timeout: 10000 }
+          );
         } else {
           // Existing execution for other languages
           response = await axios.post(
@@ -937,59 +797,75 @@ if __name__ == "__main__":
               files: [{ content: code }],
               stdin: testCase.input,
             },
-            { timeout: 10000 },
-          )
-
-          const rawOutput = response.data.run.output.trim()
-          const expectedOutput = testCase.output.trim()
-          const status = rawOutput === expectedOutput ? "correct" : "wrong"
-
-          results.push({
-            status,
-            actualOutput: rawOutput,
-            expectedOutput,
-            testCaseNumber: i + 1,
-            executionTime: response.data.run.time * 1000 || 0,
-          })
+            { timeout: 10000 }
+          );
         }
-
-        setTestResults([...results])
+  
+        const rawOutput = response.data.run.output.trim();
+        const cleanOutput = rawOutput.replace(/:memory:/g, '');
+        const expectedOutput = testCase.output.trim();
+  
+        // Handle SQL-specific JSON comparison
+        let status: "correct" | "wrong" = "wrong";
+        if (language === "sql") {
+          try {
+            const outputJson = JSON.parse(cleanOutput);
+            const expectedJson = JSON.parse(expectedOutput);
+            status = JSON.stringify(outputJson) === JSON.stringify(expectedJson) ? "correct" : "wrong";
+          } catch {
+            status = cleanOutput === expectedOutput ? "correct" : "wrong";
+          }
+        } else {
+          status = cleanOutput === expectedOutput ? "correct" : "wrong";
+        }
+  
+        results.push({
+          status,
+          actualOutput: cleanOutput,
+          expectedOutput,
+          testCaseNumber: i + 1,
+          executionTime: response.data.run.time * 1000 || 0,
+        });
+  
+        setTestResults([...results]);
         setTestCaseProgress((prev) => ({
           ...prev,
           passed: results.filter((r) => r.status === "correct").length,
-        }))
-
-        if (results[results.length - 1].status === "wrong") break
+        }));
+  
+        if (status === "wrong") break;
       }
-
+  
       setCompilationResult({
         output: results.every((r) => r.status === "correct")
           ? "All test cases passed successfully!"
-          : `${results.filter((r) => r.status === "correct").length} out of ${testCases.length} test cases passed.`,
+          : `${results.filter((r) => r.status === "correct").length} out of ${
+              testCases.length
+            } test cases passed.`,
         error: null,
         testCaseResults: results,
-      })
+      });
     } catch (error) {
-      console.error("Error running code:", error)
+      console.error("Error running code:", error);
       const errorMessage = axios.isAxiosError(error)
         ? error.response?.data?.message || error.message
-        : "Unknown execution error"
-
+        : "Unknown execution error";
+  
       const errorResult: TestCaseResult = {
         status: "wrong",
         actualOutput: errorMessage,
         testCaseNumber: currentTestCase + 1,
-      }
-
+      };
+  
       setCompilationResult({
         output: "",
         error: `Execution failed: ${errorMessage}`,
         testCaseResults: [errorResult],
-      })
+      });
     } finally {
-      setTestCaseProgress((prev) => ({ ...prev, running: false }))
+      setTestCaseProgress((prev) => ({ ...prev, running: false }));
     }
-  }
+  };
 
   // Reset code
   const handleReset = () => {
@@ -997,27 +873,12 @@ if __name__ == "__main__":
     setTestResults([])
     setShowOutputSection(false)
     setCompilationResult(null)
-    setSqlDataResult(null)
-    setShowDataViewer(false)
   }
 
   // Language change
   const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newLanguage = e.target.value
-    setLanguage(newLanguage)
-
-    // Set appropriate starter code based on language
-    if (newLanguage === "sql") {
-      setCode(`-- Write your SQL query here\n\n-- Example: SELECT * FROM users\n`)
-    } else if (newLanguage === "python") {
-      setCode(
-        `# Start coding in Python here...\n\ndef main():\n    # Your code here\n    pass\n\nif __name__ == "__main__":\n    main()\n`,
-      )
-    } else if (newLanguage === "javascript") {
-      setCode(`// Start coding in JavaScript here...\n\nfunction main() {\n    // Your code here\n}\n\nmain();\n`)
-    } else {
-      setCode(`// Start coding in ${newLanguage} here...\n`)
-    }
+    setLanguage(e.target.value)
+    setCode(`// Start coding in ${e.target.value} here...`)
   }
 
   // Toggle full screen
@@ -1058,21 +919,12 @@ if __name__ == "__main__":
   const handleCodingQuestionSelect = (question: Question) => {
     setSelectedCodingQuestion(question)
     setCurrentQuestionIndex(examSections.coding?.questions.findIndex((q) => q._id === question._id) ?? 0)
-
-    // Set appropriate starter code based on selected language
-    if (language === "sql") {
-      setCode(`-- Write your SQL query for: ${question.text}\n\n-- Example: SELECT * FROM table_name\n`)
-    } else {
-      setCode(
-        `// Write your code here for Question ${examSections.coding?.questions.findIndex((q) => q._id === question._id) + 1}:\n// ${question.text}\n\n`,
-      )
-    }
-
+    setCode(
+      `// Write your code here for Question ${examSections.coding?.questions.findIndex((q) => q._id === question._id) + 1}:\n// ${question.text}\n\n`,
+    )
     setTestResults([])
     setShowOutputSection(false)
     setCompilationResult(null)
-    setSqlDataResult(null)
-    setShowDataViewer(false)
   }
 
   // Keyboard navigation
@@ -1760,56 +1612,6 @@ if __name__ == "__main__":
                           </div>
                         </div>
                       )}
-
-                      {/* SQL Data Viewer */}
-                      {showDataViewer && sqlDataResult && (
-                        <div className="mb-6">
-                          <div className="flex items-center justify-between mb-2">
-                            <h3 className="text-gray-300 text-lg font-semibold">SQL Query Results</h3>
-                            <div className="flex items-center space-x-2">
-                              <Database className="w-4 h-4 text-blue-400" />
-                              <span className="text-blue-400 text-xs">Data View</span>
-                            </div>
-                          </div>
-
-                          <div className="bg-gray-900 rounded-lg border border-gray-700 overflow-x-auto">
-                            {Array.isArray(sqlDataResult) && sqlDataResult.length > 0 ? (
-                              <table className="w-full text-sm text-gray-300">
-                                <thead className="bg-gray-800 text-xs uppercase">
-                                  <tr>
-                                    {sqlTableStructure.map((column, index) => (
-                                      <th key={index} className="px-4 py-2 text-left font-medium text-gray-400">
-                                        {column}
-                                      </th>
-                                    ))}
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {sqlDataResult.map((row, rowIndex) => (
-                                    <tr
-                                      key={rowIndex}
-                                      className={`${rowIndex % 2 === 0 ? "bg-gray-900" : "bg-gray-800/50"} border-b border-gray-700`}
-                                    >
-                                      {sqlTableStructure.map((column, colIndex) => (
-                                        <td key={colIndex} className="px-4 py-2 whitespace-nowrap font-mono text-xs">
-                                          {row[column] === null ? (
-                                            <span className="text-gray-500">NULL</span>
-                                          ) : (
-                                            String(row[column])
-                                          )}
-                                        </td>
-                                      ))}
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            ) : (
-                              <div className="p-4 text-center text-gray-400">No data returned from query</div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
                       <h3 className="text-gray-300 text-lg font-semibold mb-4">Compilation Result</h3>
                       {compilationResult ? (
                         <div>
