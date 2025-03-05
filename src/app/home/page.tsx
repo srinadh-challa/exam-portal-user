@@ -14,6 +14,7 @@ import {
   AlertCircle,
   Camera,
   ArrowRight,
+  Database,
 } from "lucide-react"
 import { ArrowsPointingOutIcon, ArrowsPointingInIcon } from "@heroicons/react/24/solid"
 import { toast, ToastContainer } from "react-toastify"
@@ -87,6 +88,18 @@ function ExamPortal() {
   }>({ total: 0, passed: 0, running: false })
   const [testResults, setTestResults] = useState<TestCaseResult[]>([])
   const [tabSwitchCount, setTabSwitchCount] = useState<number>(0)
+  const [outputSectionHeight, setOutputSectionHeight] = useState<number>(200)
+  const [isDragging, setIsDragging] = useState<boolean>(false)
+  const dragHandleRef = useRef<HTMLDivElement>(null)
+  const [editorHeight, setEditorHeight] = useState<string>("60vh")
+  const [isEditorDragging, setIsEditorDragging] = useState<boolean>(false)
+  const editorDragHandleRef = useRef<HTMLDivElement>(null)
+  const [viewedQuestions, setViewedQuestions] = useState<Set<string>>(new Set())
+
+  // Add state for SQL data display
+  const [sqlDataResult, setSqlDataResult] = useState<any[] | null>(null)
+  const [sqlTableStructure, setSqlTableStructure] = useState<string[]>([])
+  const [showDataViewer, setShowDataViewer] = useState<boolean>(false)
 
   const [progress, setProgress] = useState<Record<string, number>>({
     mcqs: 0,
@@ -94,6 +107,52 @@ function ExamPortal() {
     ai: 0,
     coding: 0,
   })
+  const [questionPanelWidth, setQuestionPanelWidth] = useState(33.33)
+  const [isPanelDragging, setIsPanelDragging] = useState(false)
+  const SAMPLE_TABLE_STRUCTURE = ["id", "name", "age", "grade", "gender", "email", "school_name"];
+const SAMPLE_TABLE_DATA = [
+  { id: 1, name: "Alice Johnson", age: 10, grade: "5th Grade", gender: "Female", email: "alice@email.com", school_name: "Springfield Elementary" },
+  { id: 2, name: "Bob Smith", age: 12, grade: "7th Grade", gender: "Male", email: "bob@email.com", school_name: "Riverdale School" },
+  { id: 3, name: "Charlie Brown", age: 9, grade: "4th Grade", gender: "Male", email: "charlie@email.com", school_name: "Greenwood Primary" },
+  { id: 4, name: "Diana Prince", age: 11, grade: "6th Grade", gender: "Female", email: "diana@email.com", school_name: "Hilltop Academy" },
+  { id: 5, name: "Ethan Hunt", age: 13, grade: "8th Grade", gender: "Male", email: "ethan@email.com", school_name: "Springfield Elementary" }
+];
+
+// Add this helper function
+const isSchoolChildrenSetup = (input: string) => {
+  return input.includes("CREATE TABLE SchoolChildren") && input.includes("INSERT INTO SchoolChildren");
+};
+
+  // Add these drag handlers for panel divider
+  const handlePanelDragStart = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsPanelDragging(true)
+    document.addEventListener("mousemove", handlePanelDragMove)
+    document.addEventListener("mouseup", handlePanelDragEnd)
+  }
+
+  const handlePanelDragMove = useCallback(
+    (e: MouseEvent) => {
+      if (isPanelDragging) {
+        const container = document.querySelector(".fixed.inset-0.bg-gray-900")
+        if (!container) return
+
+        const containerRect = container.getBoundingClientRect()
+        const newWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100
+
+        // Ensure we stay within container bounds
+        const boundedWidth = Math.min(Math.max(25, newWidth), 75)
+        setQuestionPanelWidth(boundedWidth)
+      }
+    },
+    [isPanelDragging],
+  )
+
+  const handlePanelDragEnd = useCallback(() => {
+    setIsPanelDragging(false)
+    document.removeEventListener("mousemove", handlePanelDragMove)
+    document.removeEventListener("mouseup", handlePanelDragEnd)
+  }, [handlePanelDragMove])
 
   useEffect(() => {
     const isMobile = () => {
@@ -253,38 +312,59 @@ function ExamPortal() {
     const storedEmail = localStorage.getItem("userEmail")
     if (storedEmail) {
       setUserEmail(storedEmail)
+    } else {
+      // Try to get user info from the API
+      const fetchUserInfo = async () => {
+        try {
+          const token = localStorage.getItem("token")
+          if (!token) return
+
+          const response = await axios.get(`${API_URL}/auth/me`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          })
+
+          if (response.data && response.data.email) {
+            setUserEmail(response.data.email)
+            localStorage.setItem("userEmail", response.data.email)
+          }
+        } catch (error) {
+          console.error("Error fetching user info:", error)
+        }
+      }
+
+      fetchUserInfo()
     }
   }, [])
 
-  // Fetch questions
+  // Update the fetchQuestions function
   useEffect(() => {
     const fetchQuestions = async () => {
       try {
         setIsLoading(true)
-        const token = localStorage.getItem("token")
-        if (!token) {
-          throw new Error("No authentication token found")
-        }
 
-        const response = await axios.get(`${API_URL}/questions/user`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        const questions = response.data.data
+        // Make the API call to get questions
+        const response = await axios.get(`${API_URL}/questions/user`)
+
+        // Transform the response data into the required format
+        const questionsData = response.data.data
 
         const sections: Record<string, ExamSection> = {
-          mcqs: { title: "Multiple Choice Questions", questions: [] },
-          aptitude: { title: "Aptitude Test", questions: [] },
-          ai: { title: "Artificial Intelligence", questions: [] },
-          coding: { title: "Coding Challenge", questions: [] },
+          mcqs: { title: "Multiple Choice Questions", questions: questionsData.mcqs || [] },
+          aptitude: { title: "Aptitude Test", questions: questionsData.aptitude || [] },
+          ai: { title: "Artificial Intelligence", questions: questionsData.ai || [] },
+          coding: { title: "Coding Challenge", questions: questionsData.coding || [] },
         }
 
-        questions.forEach((question: Question) => {
-          if (sections[question.section]) {
-            sections[question.section].questions.push(question)
-          }
-        })
-
         setExamSections(sections)
+
+        // Initialize progress tracking
+        const newProgress: Record<string, number> = {}
+        Object.keys(sections).forEach((section) => {
+          newProgress[section] = 0
+        })
+        setProgress(newProgress)
       } catch (error) {
         console.error("Error fetching questions:", error)
         toast.error("Failed to load questions. Please try again.")
@@ -293,25 +373,32 @@ function ExamPortal() {
       }
     }
 
+    // Call fetchQuestions when component mounts
     fetchQuestions()
-  }, [])
+  }, []) // Empty dependency array means this runs once when component mounts
 
-  // Timer effect
+  // Update the timer effect to fix the 'prev' unused variable warning
   useEffect(() => {
     let timer: NodeJS.Timeout | undefined
+
     if (examStarted && timeLeft > 0) {
       timer = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
+        setTimeLeft((currentTime) => {
+          if (currentTime <= 1) {
             clearInterval(timer)
             handleAutoSubmit()
             return 0
           }
-          return prev - 1
+          return currentTime - 1
         })
       }, 1000)
     }
-    return () => clearInterval(timer)
+
+    return () => {
+      if (timer) {
+        clearInterval(timer)
+      }
+    }
   }, [examStarted, timeLeft, handleAutoSubmit])
 
   // Check camera permissions
@@ -424,6 +511,7 @@ function ExamPortal() {
         throw new Error("Camera and microphone permissions are required to start the exam.")
       }
 
+      // Start the exam session
       const response = await axios.post(
         `${API_URL}/exams/start`,
         { duration: 60 },
@@ -440,9 +528,10 @@ function ExamPortal() {
         setExamStarted(true)
         setCurrentSection("mcqs")
         await initializeCamera()
-
-        // Call toggleFullScreenExam here
         await toggleFullScreenExam()
+
+        // Questions will be fetched automatically by the useEffect hook
+        // when examStarted changes to true
       } else {
         throw new Error("Invalid response from server")
       }
@@ -498,6 +587,12 @@ function ExamPortal() {
           ...prev,
           [questionId]: answer,
         }))
+
+        // Update progress for the current section
+        setProgress((prev) => ({
+          ...prev,
+          [currentSection]: Object.keys(answers).filter((key) => key.startsWith(currentSection)).length + 1,
+        }))
       } else {
         throw new Error("Unexpected response from server")
       }
@@ -537,6 +632,8 @@ function ExamPortal() {
   const handleSectionChange = (section: string) => {
     setCurrentSection(section)
     setCurrentQuestionIndex(0)
+    const questionId = `${section}-1`
+    setViewedQuestions((prev) => new Set(prev).add(questionId))
     if (section === "coding") {
       setIsContainerVisible(false)
       setSelectedCodingQuestion(null)
@@ -546,18 +643,26 @@ function ExamPortal() {
   // Question change
   const handleQuestionChange = (index: number) => {
     setCurrentQuestionIndex(index)
+    const questionId = `${currentSection}-${index + 1}`
+    setViewedQuestions((prev) => new Set(prev).add(questionId))
   }
 
   // Next question
   const handleNextQuestion = useCallback(() => {
     if (currentQuestionIndex < (examSections[currentSection]?.questions?.length || 0) - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1)
+      const nextIndex = currentQuestionIndex + 1
+      setCurrentQuestionIndex(nextIndex)
+      const questionId = `${currentSection}-${nextIndex + 1}`
+      setViewedQuestions((prev) => new Set(prev).add(questionId))
     } else {
       const sections = Object.keys(examSections)
       const currentIndex = sections.indexOf(currentSection)
       if (currentIndex < sections.length - 1) {
-        setCurrentSection(sections[currentIndex + 1])
+        const nextSection = sections[currentIndex + 1]
+        setCurrentSection(nextSection)
         setCurrentQuestionIndex(0)
+        const questionId = `${nextSection}-1`
+        setViewedQuestions((prev) => new Set(prev).add(questionId))
       }
     }
   }, [examSections, currentSection, currentQuestionIndex])
@@ -565,13 +670,20 @@ function ExamPortal() {
   // Previous question
   const handlePreviousQuestion = useCallback(() => {
     if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(currentQuestionIndex - 1)
+      const prevIndex = currentQuestionIndex - 1
+      setCurrentQuestionIndex(prevIndex)
+      const questionId = `${currentSection}-${prevIndex + 1}`
+      setViewedQuestions((prev) => new Set(prev).add(questionId))
     } else {
       const sections = Object.keys(examSections)
       const currentIndex = sections.indexOf(currentSection)
       if (currentIndex > 0) {
-        setCurrentSection(sections[currentIndex - 1])
-        setCurrentQuestionIndex((examSections[sections[currentIndex - 1]]?.questions?.length || 1) - 1)
+        const prevSection = sections[currentIndex - 1]
+        setCurrentSection(prevSection)
+        const lastIndex = (examSections[prevSection]?.questions?.length || 1) - 1
+        setCurrentQuestionIndex(lastIndex)
+        const questionId = `${prevSection}-${lastIndex + 1}`
+        setViewedQuestions((prev) => new Set(prev).add(questionId))
       }
     }
   }, [examSections, currentSection, currentQuestionIndex])
@@ -622,13 +734,19 @@ function ExamPortal() {
     }
   }
 
-  // Run code
+  // Run code with enhanced SQL support
+  const PISTON_API_URL = "https://emkc.org/api/v2/piston"
+
   const handleRun = async () => {
     if (!selectedCodingQuestion) return
 
     setCompilationResult(null)
     setShowOutputSection(true)
     setTestResults([])
+    setSqlDataResult(null)
+    setSqlTableStructure([])
+    setShowDataViewer(false)
+
     setTestCaseProgress({
       total: selectedCodingQuestion.testCases?.length || 0,
       passed: 0,
@@ -636,63 +754,212 @@ function ExamPortal() {
     })
 
     try {
-      const token = localStorage.getItem("token")
-      if (!token) {
-        throw new Error("Authentication token not found")
-      }
-
       const testCases = selectedCodingQuestion.testCases || []
       const results: TestCaseResult[] = []
 
       for (let i = 0; i < testCases.length; i++) {
         setCurrentTestCase(i)
         const testCase = testCases[i]
+        let response
 
-        // Set current test case as running
-        const runningResult: TestCaseResult = {
-          status: "running",
-          actualOutput: "Running test case...",
-          testCaseNumber: i + 1,
-        }
-        setTestResults([...results, runningResult])
+        if (language === "sql") {
+          // Enhanced Python script for SQL with better formatting and table structure extraction
+          const pythonScript = `
+import sqlite3
+import json
+import sys
 
-        const response = await axios.post(
-          `${API_URL}/exams/compile`,
-          {
-            code,
-            language,
-            stdin: testCase.input,
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
+def main():
+    # Create in-memory database
+    conn = sqlite3.connect(':memory:')
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    try:
+        # Execute setup SQL from test case input
+        cursor.executescript("""${testCase.input.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n")}""")
+    except Exception as e:
+        return json.dumps({
+            "error": f"Setup Error: {str(e)}",
+            "data": None,
+            "columns": None
+        })
+    
+    try:
+        # Execute user's SQL query
+        cursor.execute("""${code.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n")}""")
+        
+        # Get results if query returns data
+        if cursor.description:
+            columns = [col[0] for col in cursor.description]
+            rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+            return json.dumps({
+                "error": None,
+                "data": rows,
+                "columns": columns
+            })
+        else:
+            # For non-SELECT queries that modify data, try to show affected tables
+            tables_query = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+            cursor.execute(tables_query)
+            tables = [row[0] for row in cursor.fetchall()]
+            
+            all_data = {}
+            all_columns = {}
+            
+            for table in tables:
+                try:
+                    cursor.execute(f"SELECT * FROM {table} LIMIT 10")
+                    if cursor.description:
+                        table_columns = [col[0] for col in cursor.description]
+                        table_rows = [dict(zip(table_columns, row)) for row in cursor.fetchall()]
+                        all_data[table] = table_rows
+                        all_columns[table] = table_columns
+                except:
+                    pass
+            
+            return json.dumps({
+                "error": None,
+                "message": "Query executed successfully (no direct results)",
+                "tables": all_data,
+                "table_columns": all_columns
+            })
+    except Exception as e:
+        return json.dumps({
+            "error": f"Execution Error: {str(e)}",
+            "data": None,
+            "columns": None
+        })
+    finally:
+        conn.close()
+
+if __name__ == "__main__":
+    result = main()
+    print(result)
+          `.trim()
+
+          response = await axios.post(
+            `${PISTON_API_URL}/execute`,
+            {
+              language: "python",
+              version: "3.10",
+              files: [{ content: pythonScript }],
             },
-          },
-        )
+            { timeout: 10000 },
+          )
 
-        const actualOutput = response.data.output.trim()
-        const expectedOutput = testCase.output.trim()
-        const status: "correct" | "wrong" = actualOutput === expectedOutput ? "correct" : "wrong"
+          const rawOutput = response.data.run.output.trim()
 
-        const result: TestCaseResult = {
-          status,
-          actualOutput,
-          expectedOutput,
-          testCaseNumber: i + 1,
-          executionTime: response.data.executionTime || 0,
+          try {
+            const sqlResult = JSON.parse(rawOutput)
+
+            if (sqlResult.error) {
+              // Handle SQL execution error
+              results.push({
+                status: "wrong",
+                actualOutput: sqlResult.error,
+                expectedOutput: testCase.output,
+                testCaseNumber: i + 1,
+              })
+
+              setTestResults([...results])
+              setTestCaseProgress((prev) => ({
+                ...prev,
+                passed: results.filter((r) => r.status === "correct").length,
+              }))
+              break
+            }
+
+            // For SELECT queries that return data
+            if (sqlResult.data) {
+              setSqlDataResult(sqlResult.data)
+              setSqlTableStructure(sqlResult.columns || [])
+              setShowDataViewer(true)
+
+              // Compare with expected output
+              const expectedOutput = JSON.parse(testCase.output)
+              const outputEquals = JSON.stringify(sqlResult.data) === JSON.stringify(expectedOutput)
+
+              results.push({
+                status: outputEquals ? "correct" : "wrong",
+                actualOutput: JSON.stringify(sqlResult.data, null, 2),
+                expectedOutput: testCase.output,
+                testCaseNumber: i + 1,
+                executionTime: response.data.run.time * 1000 || 0,
+              })
+            }
+            // For non-SELECT queries
+            else if (sqlResult.tables) {
+              // Display affected tables
+              const tableData = []
+              for (const [tableName, rows] of Object.entries(sqlResult.tables)) {
+                tableData.push({ tableName, rows, columns: sqlResult.table_columns[tableName] })
+              }
+
+              setSqlDataResult(tableData)
+              setShowDataViewer(true)
+
+              // We still need to compare with expected output
+              let outputMatches = false
+              try {
+                const expectedData = JSON.parse(testCase.output)
+                // Compare table structure and data
+                outputMatches = JSON.stringify(tableData) === JSON.stringify(expectedData)
+              } catch {
+                // If expected output isn't valid JSON, try direct string comparison
+                outputMatches = JSON.stringify(tableData) === testCase.output
+              }
+
+              results.push({
+                status: outputMatches ? "correct" : "wrong",
+                actualOutput: JSON.stringify(tableData, null, 2),
+                expectedOutput: testCase.output,
+                testCaseNumber: i + 1,
+                executionTime: response.data.run.time * 1000 || 0,
+              })
+            }
+          } catch (parseError) {
+            // Handle JSON parsing error
+            results.push({
+              status: "wrong",
+              actualOutput: `Error parsing result: ${rawOutput}`,
+              expectedOutput: testCase.output,
+              testCaseNumber: i + 1,
+            })
+          }
+        } else {
+          // Existing execution for other languages
+          response = await axios.post(
+            `${PISTON_API_URL}/execute`,
+            {
+              language: language,
+              version: "3.10",
+              files: [{ content: code }],
+              stdin: testCase.input,
+            },
+            { timeout: 10000 },
+          )
+
+          const rawOutput = response.data.run.output.trim()
+          const expectedOutput = testCase.output.trim()
+          const status = rawOutput === expectedOutput ? "correct" : "wrong"
+
+          results.push({
+            status,
+            actualOutput: rawOutput,
+            expectedOutput,
+            testCaseNumber: i + 1,
+            executionTime: response.data.run.time * 1000 || 0,
+          })
         }
 
-        results.push(result)
-        setTestResults(results)
-
+        setTestResults([...results])
         setTestCaseProgress((prev) => ({
           ...prev,
           passed: results.filter((r) => r.status === "correct").length,
         }))
 
-        // If test case fails, stop processing further test cases
-        if (status === "wrong") break
+        if (results[results.length - 1].status === "wrong") break
       }
 
       setCompilationResult({
@@ -704,17 +971,19 @@ function ExamPortal() {
       })
     } catch (error) {
       console.error("Error running code:", error)
+      const errorMessage = axios.isAxiosError(error)
+        ? error.response?.data?.message || error.message
+        : "Unknown execution error"
+
       const errorResult: TestCaseResult = {
         status: "wrong",
-        actualOutput: "Test case failed due to error",
+        actualOutput: errorMessage,
         testCaseNumber: currentTestCase + 1,
       }
+
       setCompilationResult({
         output: "",
-        error:
-          error instanceof Error
-            ? `Error running code: ${error.message}`
-            : "An unknown error occurred while running the code",
+        error: `Execution failed: ${errorMessage}`,
         testCaseResults: [errorResult],
       })
     } finally {
@@ -728,12 +997,27 @@ function ExamPortal() {
     setTestResults([])
     setShowOutputSection(false)
     setCompilationResult(null)
+    setSqlDataResult(null)
+    setShowDataViewer(false)
   }
 
   // Language change
   const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setLanguage(e.target.value)
-    setCode(`// Start coding in ${e.target.value} here...`)
+    const newLanguage = e.target.value
+    setLanguage(newLanguage)
+
+    // Set appropriate starter code based on language
+    if (newLanguage === "sql") {
+      setCode(`-- Write your SQL query here\n\n-- Example: SELECT * FROM users\n`)
+    } else if (newLanguage === "python") {
+      setCode(
+        `# Start coding in Python here...\n\ndef main():\n    # Your code here\n    pass\n\nif __name__ == "__main__":\n    main()\n`,
+      )
+    } else if (newLanguage === "javascript") {
+      setCode(`// Start coding in JavaScript here...\n\nfunction main() {\n    // Your code here\n}\n\nmain();\n`)
+    } else {
+      setCode(`// Start coding in ${newLanguage} here...\n`)
+    }
   }
 
   // Toggle full screen
@@ -766,9 +1050,7 @@ function ExamPortal() {
       setIsFullScreenExam(!isFullScreenExam)
     } catch (error) {
       console.error("Error toggling full-screen mode:", error)
-      toast.error(
-        "Unable to toggle full-screen mode. Please ensure you&apos;re using a compatible browser and try again.",
-      )
+      toast.error("Unable to toggle full-screen mode. Please ensure you're using a compatible browser and try again.")
     }
   }
 
@@ -776,12 +1058,21 @@ function ExamPortal() {
   const handleCodingQuestionSelect = (question: Question) => {
     setSelectedCodingQuestion(question)
     setCurrentQuestionIndex(examSections.coding?.questions.findIndex((q) => q._id === question._id) ?? 0)
-    setCode(
-      `// Write your code here for Question ${examSections.coding?.questions.findIndex((q) => q._id === question._id) + 1}:\n// ${question.text}\n\n`,
-    )
+
+    // Set appropriate starter code based on selected language
+    if (language === "sql") {
+      setCode(`-- Write your SQL query for: ${question.text}\n\n-- Example: SELECT * FROM table_name\n`)
+    } else {
+      setCode(
+        `// Write your code here for Question ${examSections.coding?.questions.findIndex((q) => q._id === question._id) + 1}:\n// ${question.text}\n\n`,
+      )
+    }
+
     setTestResults([])
     setShowOutputSection(false)
     setCompilationResult(null)
+    setSqlDataResult(null)
+    setShowDataViewer(false)
   }
 
   // Keyboard navigation
@@ -797,6 +1088,111 @@ function ExamPortal() {
     window.addEventListener("keydown", handleKeyPress)
     return () => window.removeEventListener("keydown", handleKeyPress)
   }, [handleNextQuestion, handlePreviousQuestion])
+
+  // Add this useEffect to handle loading timeout
+  useEffect(() => {
+    if (isLoading) {
+      const timeoutId = setTimeout(() => {
+        setIsLoading(false)
+        toast.error("Loading timed out. Please refresh and try again.")
+      }, 10000) // 10 seconds timeout
+
+      return () => clearTimeout(timeoutId)
+    }
+  }, [isLoading])
+
+  const handleDragStart = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsDragging(true)
+    document.addEventListener("mousemove", handleDragMove)
+    document.addEventListener("mouseup", handleDragEnd)
+  }
+
+  const handleDragMove = useCallback(
+    (e: MouseEvent) => {
+      if (isDragging) {
+        // Get the container element
+        const compilerContainer = document.getElementById("compiler-container")
+        if (!compilerContainer) return
+
+        // Get the position of the container
+        const containerRect = compilerContainer.getBoundingClientRect()
+
+        // Calculate the distance from the mouse to the bottom of the container
+        const distanceFromBottom = containerRect.bottom - e.clientY
+
+        // Set a new height based on the distance (with min and max constraints)
+        const newHeight = Math.max(100, Math.min(containerRect.height * 0.8, distanceFromBottom))
+
+        setOutputSectionHeight(newHeight)
+      }
+    },
+    [isDragging],
+  )
+
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false)
+    document.removeEventListener("mousemove", handleDragMove)
+    document.removeEventListener("mouseup", handleDragEnd)
+  }, [handleDragMove])
+
+  useEffect(() => {
+    return () => {
+      document.removeEventListener("mousemove", handleDragMove)
+      document.removeEventListener("mouseup", handleDragEnd)
+    }
+  }, [handleDragMove, handleDragEnd])
+
+  const handleEditorDragStart = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsEditorDragging(true)
+    document.addEventListener("mousemove", handleEditorDragMove)
+    document.addEventListener("mouseup", handleEditorDragEnd)
+  }
+
+  const handleEditorDragMove = useCallback(
+    (e: MouseEvent) => {
+      if (isEditorDragging) {
+        const compilerContainer = document.getElementById("compiler-container")
+        if (!compilerContainer) return
+
+        const containerRect = compilerContainer.getBoundingClientRect()
+        const relativeY = e.clientY - containerRect.top
+        const newHeight = Math.max(200, Math.min(containerRect.height * 0.8, relativeY))
+        setEditorHeight(`${newHeight}px`)
+      }
+    },
+    [isEditorDragging],
+  )
+
+  const handleEditorDragEnd = useCallback(() => {
+    setIsEditorDragging(false)
+    document.removeEventListener("mousemove", handleEditorDragMove)
+    document.removeEventListener("mouseup", handleEditorDragEnd)
+  }, [handleEditorDragMove])
+
+  useEffect(() => {
+    return () => {
+      document.removeEventListener("mousemove", handleEditorDragMove)
+      document.removeEventListener("mouseup", handleEditorDragEnd)
+    }
+  }, [handleEditorDragMove, handleEditorDragEnd])
+
+  useEffect(() => {
+    // Clean up panel drag event listeners
+    return () => {
+      document.removeEventListener("mousemove", handlePanelDragMove)
+      document.removeEventListener("mouseup", handlePanelDragEnd)
+    }
+  }, [handlePanelDragMove, handlePanelDragEnd])
+
+  useEffect(() => {
+    // Clean up editor drag event listeners
+    return () => {
+      document.removeEventListener("mousemove", handleEditorDragMove)
+      document.removeEventListener("mouseup", handleEditorDragEnd)
+    }
+  }, [handleEditorDragMove, handleEditorDragEnd])
 
   if (isMobileDevice) {
     return (
@@ -943,7 +1339,7 @@ function ExamPortal() {
       )}
 
       {/* Three-column Layout */}
-      <div className="flex max-w-7xl mx-auto px-4 py-6 mt-16">
+      <div className="flex max-w-7xl mx-auto px-4 py-6 mt-2">
         {/* Column 1: Sections Menu */}
         <div className="w-48 flex-shrink-0">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg sticky top-24 p-4">
@@ -998,22 +1394,30 @@ function ExamPortal() {
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg sticky top-24 p-2">
               <h3 className="font-small text-gray-600 dark:text-gray-300 mb-3">Questions</h3>
               <div className="flex flex-col space-y-2">
-                {examSections[currentSection]?.questions.map((_, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => handleQuestionChange(idx)}
-                    className={`p-2 rounded-lg text-sm font-medium w-16 transition-all
-                  ${
-                    currentQuestionIndex === idx
-                      ? "bg-blue-600 dark:bg-blue-500 text-white w-16"
-                      : answers[`${currentSection}-${idx + 1}`]
-                        ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400"
-                        : "bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600"
-                  }`}
-                  >
-                    {idx + 1}
-                  </button>
-                ))}
+                {examSections[currentSection]?.questions.map((_, idx) => {
+                  const questionId = `${currentSection}-${idx + 1}`
+                  const isAnswered = !!answers[questionId]
+                  const isViewed = viewedQuestions.has(questionId)
+
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => handleQuestionChange(idx)}
+                      className={`p-2 rounded-lg text-sm font-medium w-16 transition-all
+                        ${
+                          currentQuestionIndex === idx
+                            ? "bg-blue-600 dark:bg-blue-500 text-white"
+                            : isAnswered
+                              ? "bg-green-500 dark:bg-green-600 text-white"
+                              : isViewed
+                                ? "bg-red-500 dark:bg-red-600 text-white hover:bg-red-600 dark:hover:bg-red-700"
+                                : "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600"
+                        }`}
+                    >
+                      {idx + 1}
+                    </button>
+                  )
+                })}
               </div>
             </div>
           </div>
@@ -1204,38 +1608,98 @@ function ExamPortal() {
 
           {/* Coding Interface */}
           {isContainerVisible && selectedCodingQuestion && (
-            <div className="fixed inset-0 bg-gray-900 z-50 overflow-hidden flex">
+            <div id="compiler-container" className="fixed inset-0 bg-gray-900 z-50 overflow-hidden flex">
               {/* Left side - Question */}
-              <div className="w-1/3 p-6 overflow-y-auto border-r border-gray-700">
-                <h2 className="text-xl font-bold text-white mb-4">{selectedCodingQuestion.text}</h2>
-                <div className="space-y-6 text-gray-300">
-                  {selectedCodingQuestion.testCases && (
-                    <div>
-                      <h3 className="text-lg font-semibold mb-2">Test Cases</h3>
-                      <div className="space-y-4">
-                        {selectedCodingQuestion.testCases.map((testCase, index) => (
-                          <div key={index}>
-                            <div className="font-medium text-lg mb-2">Test Case {index + 1}</div>
-                            <div className="space-y-2">
-                              <div>
-                                <span className="text-blue-400 font-medium">Input:</span>
-                                <pre className="mt-1 font-mono text-sm">{testCase.input}</pre>
-                              </div>
-                              <div>
-                                <span className="text-green-400 font-medium">Expected Output:</span>
-                                <pre className="mt-1 font-mono text-sm">{testCase.output}</pre>
-                              </div>
-                            </div>
-                          </div>
+              <div className="overflow-y-auto border-r border-gray-700" style={{ width: `${questionPanelWidth}%` }}>
+                <div className="p-6">
+                  <h2 className="text-xl font-bold text-white mb-4">{selectedCodingQuestion.text}</h2>
+                  <div className="space-y-6 text-gray-300">
+                    {selectedCodingQuestion.testCases && (
+  <div>
+    <h3 className="text-lg font-semibold mb-2">Test Cases</h3>
+    <div className="space-y-4">
+      {selectedCodingQuestion.testCases?.map((testCase, index) => (
+        <div key={index} className="bg-gray-700 p-4 rounded-lg">
+          <div className="font-medium text-lg mb-2">Sample Test Case {index + 1}</div>
+          
+          {language === "sql" && isSchoolChildrenSetup(testCase.input) ? (
+            <div className="space-y-4">
+              <div>
+                <span className="text-blue-400 font-medium">Schema:</span>
+                <div className="mt-2 overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-800">
+                      <tr>
+                        {SAMPLE_TABLE_STRUCTURE.map((column) => (
+                          <th key={column} className="px-4 py-2 text-left text-gray-400">
+                            {column}
+                          </th>
                         ))}
-                      </div>
-                    </div>
-                  )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {SAMPLE_TABLE_DATA.map((row, rowIndex) => (
+                        <tr 
+                          key={rowIndex}
+                          className={rowIndex % 2 === 0 ? "bg-gray-900" : "bg-gray-800"}
+                        >
+                          {SAMPLE_TABLE_STRUCTURE.map((column) => (
+                            <td key={column} className="px-4 py-2 text-gray-300">
+                              {row[column as keyof typeof row]}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div>
+                <span className="text-green-400 font-medium">Expected Query Result:</span>
+                <pre className="mt-2 p-3 bg-gray-800 rounded font-mono text-sm">
+                  {testCase.output}
+                </pre>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div>
+                <span className="text-blue-400 font-medium">Input:</span>
+                <pre className="mt-1 font-mono text-sm bg-gray-800 p-2 rounded">
+                  {testCase.input}
+                </pre>
+              </div>
+              <div>
+                <span className="text-green-400 font-medium">Expected Output:</span>
+                <pre className="mt-1 font-mono text-sm bg-gray-800 p-2 rounded">
+                  {testCase.output}
+                </pre>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+                  </div>
+                </div>
+              </div>
+              <div
+                className="w-2 bg-gray-700 hover:bg-blue-500 cursor-col-resize relative z-10"
+                onMouseDown={handlePanelDragStart}
+              >
+                <div className="absolute inset-0 flex items-center justify-center h-20 w-4 -ml-1">
+                  <div className="h-10 w-1 bg-gray-500 rounded-full"></div>
                 </div>
               </div>
 
               {/* Right side - Code Editor */}
-              <div id="compiler-container" className="w-2/3 flex flex-col">
+              <div
+                id="compiler-container"
+                className="flex-1 flex flex-col"
+                style={{ width: `${100 - questionPanelWidth}%` }}
+              >
                 <div className="bg-gray-800 p-2 border-b border-gray-700 flex justify-between items-center">
                   <select
                     value={language}
@@ -1247,6 +1711,7 @@ function ExamPortal() {
                     <option value="java">Java</option>
                     <option value="cpp">C++</option>
                     <option value="c">C</option>
+                    <option value="sql">SQL</option>
                   </select>
                   <button onClick={toggleFullScreen} className="bg-gray-600 hover:bg-gray-700 text-white p-2 rounded">
                     {isFullScreen ? (
@@ -1258,12 +1723,19 @@ function ExamPortal() {
                 </div>
 
                 <MonacoEditor
-                  height="60vh"
+                  height={editorHeight}
                   language={language}
                   theme="vs-dark"
                   value={code}
                   onChange={(value) => setCode(value || "")}
                 />
+                <div
+                  ref={editorDragHandleRef}
+                  className="bg-gray-700 border-t border-b border-gray-600 h-6 cursor-ns-resize flex items-center justify-center hover:bg-gray-600 transition-colors"
+                  onMouseDown={handleEditorDragStart}
+                >
+                  <div className="bg-gray-700 h-2 cursor-ns-resize hover:bg-blue-500 transition-colors"></div>
+                </div>
 
                 <div className="bg-gray-800 p-4 flex justify-between items-center">
                   <button
@@ -1293,119 +1765,181 @@ function ExamPortal() {
                 </div>
 
                 {showOutputSection && (
-                  <div className="bg-gray-800 border-t border-gray-700 p-4 max-h-[40vh] overflow-y-auto">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-gray-300 text-lg font-semibold">Test Results</h3>
-                      {testCaseProgress.running && (
-                        <div className="flex items-center space-x-2">
-                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent"></div>
-                          <span className="text-gray-400">Running test case {currentTestCase + 1}...</span>
+                  <>
+                    <div
+                      ref={dragHandleRef}
+                      className="bg-gray-700 border-t border-b border-gray-600 h-6 cursor-ns-resize flex items-center justify-center hover:bg-gray-600 transition-colors"
+                      onMouseDown={handleDragStart}
+                    >
+                      <div className="w-24 h-2 bg-gray-500 rounded-full"></div>
+                    </div>
+                    <div
+                      className="bg-gray-800 border-t border-gray-700 p-4 overflow-y-auto"
+                      style={{ height: `${outputSectionHeight}px` }}
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-gray-300 text-lg font-semibold">Test Results</h3>
+                        {testCaseProgress.running && (
+                          <div className="flex items-center space-x-2">
+                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent"></div>
+                            <span className="text-gray-400">Running test case {currentTestCase + 1}...</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {testCaseProgress.total > 0 && (
+                        <div className="mb-4 bg-gray-700 rounded-lg p-4">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-gray-300">Progress:</span>
+                            <span className="text-gray-300">
+                              {testCaseProgress.passed}/{testCaseProgress.total} passed
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-600 rounded-full h-2">
+                            <div
+                              className="bg-green-500 h-2 rounded-full transition-all duration-500"
+                              style={{
+                                width: `${(testCaseProgress.passed / testCaseProgress.total) * 100}%`,
+                              }}
+                            />
+                          </div>
                         </div>
                       )}
-                    </div>
 
-                    {testCaseProgress.total > 0 && (
-                      <div className="mb-4 bg-gray-700 rounded-lg p-4">
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-gray-300">Progress:</span>
-                          <span className="text-gray-300">
-                            {testCaseProgress.passed}/{testCaseProgress.total} passed
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-600 rounded-full h-2">
-                          <div
-                            className="bg-green-500 h-2 rounded-full transition-all duration-500"
-                            style={{
-                              width: `${(testCaseProgress.passed / testCaseProgress.total) * 100}%`,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    )}
-                    <h3 className="text-gray-300 text-lg font-semibold mb-4">Compilation Result</h3>
-                    {compilationResult ? (
-                      <div>
-                        {compilationResult.error ? (
-                          <div className="bg-red-900/30 p-4 rounded-lg">
-                            <h4 className="text-red-400 font-medium mb-2">Error:</h4>
-                            <pre className="text-red-300 font-mono text-sm whitespace-pre-wrap">
-                              {compilationResult.error}
-                            </pre>
-                          </div>
-                        ) : (
-                          <div className="bg-green-900/30 p-4 rounded-lg mb-4">
-                            <h4 className="text-green-400 font-medium mb-2">Compilation Output:</h4>
-                            <pre className="text-green-300 font-mono text-sm whitespace-pre-wrap">
-                              {compilationResult.output}
-                            </pre>
-                          </div>
-                        )}
-                        {testResults.length > 0 && (
-                          <div className="space-y-4">
-                            <h4 className="text-gray-300 font-medium text-lg">Test Case Results:</h4>
-                            <div className="grid gap-4">
-                              {testResults.map((result, index) => (
-                                <div
-                                  key={index}
-                                  className={`p-4 rounded-lg border ${
-                                    result.status === "correct"
-                                      ? "bg-green-900/30 border-green-600/30"
-                                      : "bg-red-900/30 border-red-600/30"
-                                  }`}
-                                >
-                                  <div className="flex items-center justify-between mb-2">
-                                    <h5
-                                      className={`font-medium ${
-                                        result.status === "correct" ? "text-green-400" : "text-red-400"
-                                      }`}
-                                    >
-                                      Test Case {result.testCaseNumber}
-                                    </h5>
-                                    <span
-                                      className={`px-3 py-1 rounded-full text-sm ${
-                                        result.status === "correct"
-                                          ? "bg-green-500/20 text-green-400"
-                                          : "bg-red-500/20 text-red-400"
-                                      }`}
-                                    >
-                                      {result.status === "correct" ? "Passed" : "Failed"}
-                                    </span>
-                                  </div>
-                                  <div className="space-y-2 text-sm">
-                                    <div>
-                                      <span className="text-gray-400">Expected Output:</span>
-                                      <pre className="mt-1 font-mono text-gray-300 bg-black/30 p-2 rounded">
-                                        {result.expectedOutput}
-                                      </pre>
-                                    </div>
-                                    <div>
-                                      <span className="text-gray-400">Your Output:</span>
-                                      <pre
-                                        className={`mt-1 font-mono p-2 rounded ${
-                                          result.status === "correct"
-                                            ? "text-green-300 bg-green-900/20"
-                                            : "text-red-300 bg-red-900/20"
-                                        }`}
-                                      >
-                                        {result.actualOutput}
-                                      </pre>
-                                    </div>
-                                    {result.executionTime && (
-                                      <div className="text-gray-400 text-xs">
-                                        Execution time: {result.executionTime}ms
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
+                      {/* SQL Data Viewer */}
+                      {showDataViewer && sqlDataResult && (
+                        <div className="mb-6">
+                          <div className="flex items-center justify-between mb-2">
+                            <h3 className="text-gray-300 text-lg font-semibold">SQL Query Results</h3>
+                            <div className="flex items-center space-x-2">
+                              <Database className="w-4 h-4 text-blue-400" />
+                              <span className="text-blue-400 text-xs">Data View</span>
                             </div>
                           </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-gray-400">Compiling and running your code...</div>
-                    )}
-                  </div>
+
+                          <div className="bg-gray-900 rounded-lg border border-gray-700 overflow-x-auto">
+                            {Array.isArray(sqlDataResult) && sqlDataResult.length > 0 ? (
+                              <table className="w-full text-sm text-gray-300">
+                                <thead className="bg-gray-800 text-xs uppercase">
+                                  <tr>
+                                    {sqlTableStructure.map((column, index) => (
+                                      <th key={index} className="px-4 py-2 text-left font-medium text-gray-400">
+                                        {column}
+                                      </th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {sqlDataResult.map((row, rowIndex) => (
+                                    <tr
+                                      key={rowIndex}
+                                      className={`${rowIndex % 2 === 0 ? "bg-gray-900" : "bg-gray-800/50"} border-b border-gray-700`}
+                                    >
+                                      {sqlTableStructure.map((column, colIndex) => (
+                                        <td key={colIndex} className="px-4 py-2 whitespace-nowrap font-mono text-xs">
+                                          {row[column] === null ? (
+                                            <span className="text-gray-500">NULL</span>
+                                          ) : (
+                                            String(row[column])
+                                          )}
+                                        </td>
+                                      ))}
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            ) : (
+                              <div className="p-4 text-center text-gray-400">No data returned from query</div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <h3 className="text-gray-300 text-lg font-semibold mb-4">Compilation Result</h3>
+                      {compilationResult ? (
+                        <div>
+                          {compilationResult.error ? (
+                            <div className="bg-red-900/30 p-4 rounded-lg">
+                              <h4 className="text-red-400 font-medium mb-2">Error:</h4>
+                              <pre className="text-red-300 font-mono text-sm whitespace-pre-wrap">
+                                {compilationResult.error}
+                              </pre>
+                            </div>
+                          ) : (
+                            <div className="bg-green-900/30 p-4 rounded-lg mb-4">
+                              <h4 className="text-green-400 font-medium mb-2">Compilation Output:</h4>
+                              <pre className="text-green-300 font-mono text-sm whitespace-pre-wrap">
+                                {compilationResult.output}
+                              </pre>
+                            </div>
+                          )}
+                          {testResults.length > 0 && (
+                            <div className="space-y-4">
+                              <h4 className="text-gray-300 font-medium text-lg">Test Case Results:</h4>
+                              <div className="grid gap-4">
+                                {testResults.map((result, index) => (
+                                  <div
+                                    key={index}
+                                    className={`p-4 rounded-lg border ${
+                                      result.status === "correct"
+                                        ? "bg-green-900/30 border-green-600/30"
+                                        : "bg-red-900/30 border-red-600/30"
+                                    }`}
+                                  >
+                                    <div className="flex items-center justify-between mb-2">
+                                      <h5
+                                        className={`font-medium ${
+                                          result.status === "correct" ? "text-green-400" : "text-red-400"
+                                        }`}
+                                      >
+                                        Test Case {result.testCaseNumber}
+                                      </h5>
+                                      <span
+                                        className={`px-3 py-1 rounded-full text-sm ${
+                                          result.status === "correct"
+                                            ? "bg-green-500/20 text-green-400"
+                                            : "bg-red-500/20 text-red-400"
+                                        }`}
+                                      >
+                                        {result.status === "correct" ? "Passed" : "Failed"}
+                                      </span>
+                                    </div>
+                                    <div className="space-y-2 text-sm">
+                                      <div>
+                                        <span className="text-gray-400">Expected Output:</span>
+                                        <pre className="mt-1 font-mono text-gray-300 bg-black/30 p-2 rounded">
+                                          {result.expectedOutput}
+                                        </pre>
+                                      </div>
+                                      <div>
+                                        <span className="text-gray-400">Your Output:</span>
+                                        <pre
+                                          className={`mt-1 font-mono p-2 rounded ${
+                                            result.status === "correct"
+                                              ? "text-green-300 bg-green-900/20"
+                                              : "text-red-300 bg-red-900/20"
+                                          }`}
+                                        >
+                                          {result.actualOutput}
+                                        </pre>
+                                      </div>
+                                      {result.executionTime && (
+                                        <div className="text-gray-400 text-xs">
+                                          Execution time: {result.executionTime}ms
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-gray-400">Compiling and running your code...</div>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
             </div>

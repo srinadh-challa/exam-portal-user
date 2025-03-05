@@ -19,3 +19,12 @@ body {
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
 }
+/* Add to your global CSS */
+.resize-handle {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.resize-handle:hover {
+  background-color: #3b82f6;
+}
