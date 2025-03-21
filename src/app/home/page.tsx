@@ -481,29 +481,19 @@ function ExamPortal() {
   }, [examStarted]);
   
 {/* Add these useEffect hooks to handle beforeunload and contextmenu events */}
-  useEffect(() => {
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = "Are you sure you want to leave the exam?";
-    };
-  
-    window.addEventListener("beforeunload", handleBeforeUnload);
-  
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
-  }, [examStarted]);
-  
-{/* Add these useEffect hooks to handle Right Click */}
+useEffect(() => {
+  const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+    event.preventDefault();
+    // event.returnValue = ""; // Required for some browsers to show the confirmation dialog
+  };
 
-  useEffect(() => {
-    const disableRightClick = (event: MouseEvent) => event.preventDefault();
-    document.addEventListener("contextmenu", disableRightClick);
-    
-    return () => {
-      document.removeEventListener("contextmenu", disableRightClick);
-    };
-  }, [examStarted]);
+  window.addEventListener("beforeunload", handleBeforeUnload);
+
+  return () => {
+    window.removeEventListener("beforeunload", handleBeforeUnload);
+  };
+}, [examStarted]);
+
   
 
   // Camera effect
