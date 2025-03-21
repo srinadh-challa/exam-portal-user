@@ -470,6 +470,7 @@ function ExamPortal() {
     const handlePopState = (event: PopStateEvent) => {
       alert("Back navigation is disabled during the exam.");
       window.history.pushState(null, "", window.location.href);
+      event.preventDefault();
     };
   
     window.history.pushState(null, "", window.location.href);
