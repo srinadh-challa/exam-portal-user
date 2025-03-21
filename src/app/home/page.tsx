@@ -464,6 +464,48 @@ function ExamPortal() {
     }
   }, [startRecording])
 
+{/* Add this useEffect to handle Back popstate event */}
+
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      alert("Back navigation is disabled during the exam.");
+      window.history.pushState(null, "", window.location.href);
+    };
+  
+    window.history.pushState(null, "", window.location.href);
+    window.addEventListener("popstate", handlePopState);
+  
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, [examStarted]);
+  
+{/* Add these useEffect hooks to handle beforeunload and contextmenu events */}
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "Are you sure you want to leave the exam?";
+    };
+  
+    window.addEventListener("beforeunload", handleBeforeUnload);
+  
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [examStarted]);
+  
+{/* Add these useEffect hooks to handle Right Click */}
+
+  useEffect(() => {
+    const disableRightClick = (event: MouseEvent) => event.preventDefault();
+    document.addEventListener("contextmenu", disableRightClick);
+    
+    return () => {
+      document.removeEventListener("contextmenu", disableRightClick);
+    };
+  }, [examStarted]);
+  
+
   // Camera effect
   useEffect(() => {
     if (examStarted && !isCameraReady) {
@@ -1513,12 +1555,12 @@ function ExamPortal() {
                     onChange={handleLanguageChange}
                     className="bg-gray-700 text-gray-300 px-3 py-1 rounded outline-none"
                   >
-                    <option value="javascript">JavaScript</option>
+                    {/* <option value="javascript">JavaScript</option> */}
                     <option value="python">Python</option>
                     <option value="java">Java</option>
-                    <option value="cpp">C++</option>
+                    {/* <option value="cpp">C++</option>
                     <option value="c">C</option>
-                    <option value="sql">SQL</option>
+                    <option value="sql">SQL</option> */}
                   </select>
                   <button onClick={toggleFullScreen} className="bg-gray-600 hover:bg-gray-700 text-white p-2 rounded">
                     {isFullScreen ? (
